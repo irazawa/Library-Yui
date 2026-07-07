@@ -13,7 +13,7 @@ This queue is for scheduled slow-progress runs. Each run should implement at mos
 
 ## Queue
 
-- [ ] Add `GET /version` API endpoint returning app name, version, and current milestone.
+- [x] Add `GET /version` API endpoint returning app name, version, and current milestone.
 - [ ] Add an API test for `/version`.
 - [ ] Show API health status card in the status dashboard with a simple fetch to `http://127.0.0.1:8787/health`.
 - [ ] Add a disabled URL input form shell to the main web app for future audio downloads.

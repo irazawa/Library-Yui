@@ -23,3 +23,9 @@
 - Current focus: continue Library-Yui with small real improvements.
 - Status: repository skeleton is online; next implementation remains MVP 1 audio download queue.
 - Next small step: add the smallest visible API or UI improvement before the next push.
+
+## 2026-07-08 02:07 SEAST — Slow Builder
+
+- Task: added `GET /version` returning app name, version, and current milestone.
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py -q` passed.
+- Next small step: add an API test for `/version`.
