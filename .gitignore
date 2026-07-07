@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+.npm/
+
+# Local app data
+apps/api/data/*.db
+apps/api/data/*.db-*
+library/audio/*
+library/video/*
+library/uploads/*
+library/thumbnails/*
+!library/audio/.gitkeep
+!library/video/.gitkeep
+!library/uploads/.gitkeep
+!library/thumbnails/.gitkeep
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
