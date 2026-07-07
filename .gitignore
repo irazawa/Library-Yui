@@ -9,6 +9,7 @@ venv/
 node_modules/
 dist/
 .npm/
+*.tsbuildinfo
 
 # Local app data
 apps/api/data/*.db
