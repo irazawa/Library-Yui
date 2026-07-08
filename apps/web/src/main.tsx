@@ -26,6 +26,26 @@ function App() {
           <button type="button" className="secondary">Upload coming soon</button>
         </div>
       </section>
+      <section className="library" aria-label="Library summary">
+        <header className="library-head">
+          <h2>Library</h2>
+          <p className="library-sub">Counts shown here are placeholders until the backend summary API is wired.</p>
+        </header>
+        <div className="library-counts">
+          <article className="count-card">
+            <span className="count-value">0</span>
+            <span className="count-label">Audio</span>
+          </article>
+          <article className="count-card">
+            <span className="count-value">0</span>
+            <span className="count-label">Video</span>
+          </article>
+          <article className="count-card">
+            <span className="count-value">0</span>
+            <span className="count-label">Uploads</span>
+          </article>
+        </div>
+      </section>
       <section className="cards">
         <article><h2>Audio</h2><p>MP3 downloads will appear here.</p></article>
         <article><h2>Video</h2><p>MP4 library support is planned after audio.</p></article>

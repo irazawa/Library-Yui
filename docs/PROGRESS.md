@@ -44,6 +44,6 @@
 
 ## 2026-07-08 SEAST — Slow Builder
 
-- Task: replaced placeholder button with a disabled URL input form shell in the main web app (`apps/web/src/main.tsx` + `styles.css`) — a YouTube URL field and disabled "Download MP3" button for future MVP 1 audio downloads.
+- Task: added an empty library section component showing Audio, Video, Uploads counts as placeholders (`apps/web/src/main.tsx` + `styles.css`) — three `count-card` placeholders set to 0, displayed above the existing cards section.
 - Verification: `cd apps/web && npm run build` — built successfully (tsc + vite), 15 modules transformed.
-- Next small step: add an empty library section component showing Audio, Video, Uploads counts as placeholders.
+- Next small step: add `docs/API.md` documenting `/health` and `/version`.
