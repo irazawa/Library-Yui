@@ -29,3 +29,9 @@
 - Task: added `GET /version` returning app name, version, and current milestone.
 - Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py -q` passed.
 - Next small step: add an API test for `/version`.
+
+## 2026-07-08 — Slow Builder
+
+- Task: added `tests/test_version.py` covering the `/version` endpoint response.
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_version.py -q` — 2 passed.
+- Next small step: show API health status card in the status dashboard.
