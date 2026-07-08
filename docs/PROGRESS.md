@@ -35,3 +35,9 @@
 - Task: added `tests/test_version.py` covering the `/version` endpoint response.
 - Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_version.py -q` — 2 passed.
 - Next small step: show API health status card in the status dashboard.
+
+## 2026-07-08 — Slow Builder
+
+- Task: added API health status card in the status dashboard (`apps/status/src/main.tsx` + `styles.css`) that fetches `http://127.0.0.1:8787/health` and shows Online/Offline/Checking states.
+- Verification: `cd apps/status && npm run build` — built successfully (tsc + vite), 15 modules transformed.
+- Next small step: add a disabled URL input form shell to the main web app for future audio downloads.
