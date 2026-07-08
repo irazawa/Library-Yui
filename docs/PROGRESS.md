@@ -41,3 +41,9 @@
 - Task: added API health status card in the status dashboard (`apps/status/src/main.tsx` + `styles.css`) that fetches `http://127.0.0.1:8787/health` and shows Online/Offline/Checking states.
 - Verification: `cd apps/status && npm run build` — built successfully (tsc + vite), 15 modules transformed.
 - Next small step: add a disabled URL input form shell to the main web app for future audio downloads.
+
+## 2026-07-08 SEAST — Slow Builder
+
+- Task: replaced placeholder button with a disabled URL input form shell in the main web app (`apps/web/src/main.tsx` + `styles.css`) — a YouTube URL field and disabled "Download MP3" button for future MVP 1 audio downloads.
+- Verification: `cd apps/web && npm run build` — built successfully (tsc + vite), 15 modules transformed.
+- Next small step: add an empty library section component showing Audio, Video, Uploads counts as placeholders.

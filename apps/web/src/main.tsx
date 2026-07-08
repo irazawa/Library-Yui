@@ -12,8 +12,17 @@ function App() {
           This shell will become the downloader, upload manager, and collection browser.
           MVP 1 will connect the YouTube URL form to the FastAPI download queue.
         </p>
+        <form className="url-form" aria-label="Audio download URL form (coming soon)" onSubmit={(e) => e.preventDefault()}>
+          <input
+            type="url"
+            className="url-input"
+            placeholder="https://www.youtube.com/watch?v=..."
+            disabled
+            aria-label="Video URL"
+          />
+          <button type="submit" disabled>Download MP3</button>
+        </form>
         <div className="actions">
-          <button type="button">Download form coming soon</button>
           <button type="button" className="secondary">Upload coming soon</button>
         </div>
       </section>
