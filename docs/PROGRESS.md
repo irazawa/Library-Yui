@@ -47,3 +47,9 @@
 - Task: added an empty library section component showing Audio, Video, Uploads counts as placeholders (`apps/web/src/main.tsx` + `styles.css`) — three `count-card` placeholders set to 0, displayed above the existing cards section.
 - Verification: `cd apps/web && npm run build` — built successfully (tsc + vite), 15 modules transformed.
 - Next small step: add `docs/API.md` documenting `/health` and `/version`.
+
+## 2026-07-09 — Slow Builder
+
+- Task: added `docs/API.md` documenting `GET /health` and `GET /version` (fields, examples, base URL).
+- Verification: `git diff --check` (docs-only task) — clean, no whitespace errors.
+- Next small step: add backend storage path constants for audio, video, uploads, and thumbnails.
