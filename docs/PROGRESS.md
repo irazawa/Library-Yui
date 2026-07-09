@@ -65,3 +65,9 @@
 - Task: added `GET /library/summary` endpoint (`apps/api/app/routes/library.py`) returning per-type file counts (audio, video, uploads, thumbnails) from `STORAGE_DIRS`; missing folders count as 0. Registered router in `main.py` and added `tests/test_library.py`.
 - Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_library.py -q` — 2 passed.
 - Next small step: show library summary placeholders on the main web app.
+
+## 2026-07-09 SEAST — Slow Builder (web library summary wired)
+
+- Task: wired the main web app library section to `GET /library/summary` (`apps/web/src/main.tsx`) — added a `useLibrarySummary` hook that fetches live counts and shows loading (`…`) / error (`—`) fallbacks with a status-aware subtitle.
+- Verification: `cd apps/web && npm run build` — built successfully (tsc + vite), 15 modules transformed.
+- Next small step: add a progress dashboard card that links to the GitHub repository.

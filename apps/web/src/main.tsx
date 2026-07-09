@@ -1,8 +1,58 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 
+const LIBRARY_SUMMARY_URL = 'http://127.0.0.1:8787/library/summary';
+
+type SummaryState = 'loading' | 'ok' | 'error';
+interface LibrarySummary {
+  audio: number;
+  video: number;
+  uploads: number;
+  thumbnails: number;
+}
+
+function useLibrarySummary() {
+  const [state, setState] = useState<SummaryState>('loading');
+  const [summary, setSummary] = useState<LibrarySummary | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setState('loading');
+    fetch(LIBRARY_SUMMARY_URL)
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = (await res.json()) as LibrarySummary;
+        if (cancelled) return;
+        setSummary(data);
+        setState('ok');
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setSummary(null);
+        setState('error');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return { state, summary };
+}
+
 function App() {
+  const { state, summary } = useLibrarySummary();
+  const dash = state === 'loading' ? '…' : '—';
+  const audio = state === 'ok' && summary ? String(summary.audio) : dash;
+  const video = state === 'ok' && summary ? String(summary.video) : dash;
+  const uploads = state === 'ok' && summary ? String(summary.uploads) : dash;
+  const sub =
+    state === 'ok'
+      ? 'Live counts from the backend summary API.'
+      : state === 'loading'
+        ? 'Contacting the backend summary API…'
+        : 'Backend unreachable — showing placeholders. Start the API on port 8787.';
+
   return (
     <main className="shell">
       <section className="hero">
@@ -29,19 +79,19 @@ function App() {
       <section className="library" aria-label="Library summary">
         <header className="library-head">
           <h2>Library</h2>
-          <p className="library-sub">Counts shown here are placeholders until the backend summary API is wired.</p>
+          <p className="library-sub">{sub}</p>
         </header>
         <div className="library-counts">
           <article className="count-card">
-            <span className="count-value">0</span>
+            <span className="count-value">{audio}</span>
             <span className="count-label">Audio</span>
           </article>
           <article className="count-card">
-            <span className="count-value">0</span>
+            <span className="count-value">{video}</span>
             <span className="count-label">Video</span>
           </article>
           <article className="count-card">
-            <span className="count-value">0</span>
+            <span className="count-value">{uploads}</span>
             <span className="count-label">Uploads</span>
           </article>
         </div>
