@@ -59,3 +59,9 @@
 - Task: added backend storage path constants module `apps/api/app/storage.py` (REPO_ROOT, LIBRARY_DIR, AUDIO_DIR, VIDEO_DIR, UPLOADS_DIR, THUMBNAILS_DIR, STORAGE_DIRS map, `ensure_storage_dirs()` helper) plus `tests/test_storage.py`.
 - Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_storage.py -q` — 4 passed.
 - Next small step: add `GET /library/summary` returning placeholder counts from storage folders.
+
+## 2026-07-09 SEAST — Slow Builder (library summary)
+
+- Task: added `GET /library/summary` endpoint (`apps/api/app/routes/library.py`) returning per-type file counts (audio, video, uploads, thumbnails) from `STORAGE_DIRS`; missing folders count as 0. Registered router in `main.py` and added `tests/test_library.py`.
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_library.py -q` — 2 passed.
+- Next small step: show library summary placeholders on the main web app.

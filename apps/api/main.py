@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routes.health import router as health_router
+from app.routes.library import router as library_router
 from app.routes.version import router as version_router
 
 app = FastAPI(title="Library-Yui API", version="0.1.0")
@@ -15,4 +16,5 @@ app.add_middleware(
 )
 
 app.include_router(health_router)
+app.include_router(library_router)
 app.include_router(version_router)
