@@ -83,3 +83,9 @@
 - Task: all original slow-tasks were complete; generated the next batch of 8 tiny tasks for MVP 1 (Audio Downloads) via Gemini 3.5 Flash and merged into `docs/plans/slow-tasks.md`.
 - Verification: docs-only plan update — `git diff --check` (clean).
 - Next small step: `POST /jobs` endpoint to accept a YouTube URL and initialize a pending download job.
+
+## 2026-07-10 — Slow Builder (POST /jobs endpoint + tests)
+
+- Task: added `POST /jobs` API endpoint (`apps/api/app/routes/jobs.py`) accepting a YouTube URL via `JobCreateRequest`, initializing a pending download job with a UUID, and returning 201 with `{id, url, status}`. Backed by an in-memory job store (`apps/api/app/jobs.py`). Registered router in `main.py`. Added `tests/test_jobs.py` covering 201 response, job ID generation, pending status, and stored state isolation.
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest -q` — 8 passed (full suite).
+- Next small step: implement `GET /jobs/{id}` returning the status of a specific job.
