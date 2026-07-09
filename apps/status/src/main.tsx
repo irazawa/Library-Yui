@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import './styles.css';
 
 const HEALTH_URL = 'http://127.0.0.1:8787/health';
+const GITHUB_URL = 'https://github.com/irazawa/Library-Yui';
 
 const roadmap = [
   ['MVP 0', 'Scaffold repo, API, web shell, status dashboard'],
@@ -63,6 +64,16 @@ function HealthCard() {
   );
 }
 
+function GithubCard() {
+  return (
+    <a className="github-card" href={GITHUB_URL} target="_blank" rel="noreferrer">
+      <strong>GitHub Repository</strong>
+      <span className="github-repo">irazawa/Library-Yui</span>
+      <span className="github-cta">View source →</span>
+    </a>
+  );
+}
+
 function App() {
   return (
     <main className="dashboard">
@@ -73,6 +84,7 @@ function App() {
       </header>
       <section className="grid">
         <HealthCard />
+        <GithubCard />
         {roadmap.map(([title, text]) => (
           <article key={title}>
             <strong>{title}</strong>
@@ -80,7 +92,7 @@ function App() {
           </article>
         ))}
       </section>
-      <footer>Next small step: add a disabled URL input form shell to the main web app.</footer>
+      <footer>Next small step: wire a real download job API endpoint behind the URL form shell.</footer>
     </main>
   );
 }

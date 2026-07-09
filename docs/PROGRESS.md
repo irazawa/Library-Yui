@@ -71,3 +71,9 @@
 - Task: wired the main web app library section to `GET /library/summary` (`apps/web/src/main.tsx`) — added a `useLibrarySummary` hook that fetches live counts and shows loading (`…`) / error (`—`) fallbacks with a status-aware subtitle.
 - Verification: `cd apps/web && npm run build` — built successfully (tsc + vite), 15 modules transformed.
 - Next small step: add a progress dashboard card that links to the GitHub repository.
+
+## 2026-07-09 SEAST — Slow Builder (status GitHub card)
+
+- Task: added a GitHub repository card to the status dashboard (`apps/status/src/main.tsx` + `styles.css`) linking to `https://github.com/irazawa/Library-Yui`, with hover state styling; updated the dashboard footer note to the next milestone focus.
+- Verification: `cd apps/status && npm run build` — built successfully (tsc + vite), 15 modules transformed.
+- Next small step: all slow-tasks queue items checked — generate next tiny task batch.
