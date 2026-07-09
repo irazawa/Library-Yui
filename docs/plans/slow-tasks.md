@@ -19,7 +19,7 @@ This queue is for scheduled slow-progress runs. Each run should implement at mos
 - [x] Add a disabled URL input form shell to the main web app for future audio downloads.
 - [x] Add an empty library section component showing Audio, Video, Uploads counts as placeholders.
 - [x] Add `docs/API.md` documenting `/health` and `/version`.
-- [ ] Add backend storage path constants for audio, video, uploads, and thumbnails.
+- [x] Add backend storage path constants for audio, video, uploads, and thumbnails.
 - [ ] Add `GET /library/summary` returning placeholder counts from storage folders.
 - [ ] Show library summary placeholders on the main web app.
 - [ ] Add a progress dashboard card that links to the GitHub repository.

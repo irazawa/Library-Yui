@@ -53,3 +53,9 @@
 - Task: added `docs/API.md` documenting `GET /health` and `GET /version` (fields, examples, base URL).
 - Verification: `git diff --check` (docs-only task) — clean, no whitespace errors.
 - Next small step: add backend storage path constants for audio, video, uploads, and thumbnails.
+
+## 2026-07-09 SEAST — Slow Builder
+
+- Task: added backend storage path constants module `apps/api/app/storage.py` (REPO_ROOT, LIBRARY_DIR, AUDIO_DIR, VIDEO_DIR, UPLOADS_DIR, THUMBNAILS_DIR, STORAGE_DIRS map, `ensure_storage_dirs()` helper) plus `tests/test_storage.py`.
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_storage.py -q` — 4 passed.
+- Next small step: add `GET /library/summary` returning placeholder counts from storage folders.
