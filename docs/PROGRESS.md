@@ -77,3 +77,9 @@
 - Task: added a GitHub repository card to the status dashboard (`apps/status/src/main.tsx` + `styles.css`) linking to `https://github.com/irazawa/Library-Yui`, with hover state styling; updated the dashboard footer note to the next milestone focus.
 - Verification: `cd apps/status && npm run build` — built successfully (tsc + vite), 15 modules transformed.
 - Next small step: all slow-tasks queue items checked — generate next tiny task batch.
+
+## 2026-07-09 SEAST — Slow Builder (plan refresh)
+
+- Task: all original slow-tasks were complete; generated the next batch of 8 tiny tasks for MVP 1 (Audio Downloads) via Gemini 3.5 Flash and merged into `docs/plans/slow-tasks.md`.
+- Verification: docs-only plan update — `git diff --check` (clean).
+- Next small step: `POST /jobs` endpoint to accept a YouTube URL and initialize a pending download job.

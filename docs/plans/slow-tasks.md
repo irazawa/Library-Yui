@@ -23,3 +23,14 @@ This queue is for scheduled slow-progress runs. Each run should implement at mos
 - [x] Add `GET /library/summary` returning placeholder counts from storage folders.
 - [x] Show library summary placeholders on the main web app.
 - [x] Add a progress dashboard card that links to the GitHub repository.
+
+## Next batch (generated 2026-07-09 via Gemini 3.5 Flash)
+
+- [ ] Add `POST /jobs` API endpoint accepting a YouTube URL, initializing a pending download job and returning a job ID.
+- [ ] Add an integration test verifying `POST /jobs` returns 201, generates a job ID, and stores job state.
+- [ ] Implement `GET /jobs/{id}` returning the status (pending/downloading/completed/failed) of a specific job.
+- [ ] Enable and wire the URL input form in the main web app (port 5174) to call `POST /jobs` on submit and show the resulting job ID.
+- [ ] Add a polling hook in the main web app that periodically calls `GET /jobs/{id}` and shows active job status.
+- [ ] Add `GET /library/audio` returning a JSON list of MP3 files in `library/audio`.
+- [ ] Wire the main web app library audio card to `GET /library/audio` so it lists actual audio items.
+- [ ] Update `docs/API.md` documenting the `/jobs` and `/jobs/{id}` endpoints (method, fields, example responses).
