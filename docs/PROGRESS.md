@@ -89,3 +89,9 @@
 - Task: added `POST /jobs` API endpoint (`apps/api/app/routes/jobs.py`) accepting a YouTube URL via `JobCreateRequest`, initializing a pending download job with a UUID, and returning 201 with `{id, url, status}`. Backed by an in-memory job store (`apps/api/app/jobs.py`). Registered router in `main.py`. Added `tests/test_jobs.py` covering 201 response, job ID generation, pending status, and stored state isolation.
 - Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest -q` — 8 passed (full suite).
 - Next small step: implement `GET /jobs/{id}` returning the status of a specific job.
+
+## 2026-07-10 SEAST — Slow Builder
+
+- Task: implemented `GET /jobs/{id}` in `apps/api/app/routes/jobs.py` returning job status (404 with "Job not found" for unknown ids) plus two new tests in `tests/test_jobs.py`.
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_jobs.py -q` — 5 passed.
+- Next small step: enable and wire the URL input form in the main web app (port 5174) to call `POST /jobs` on submit and show the resulting job ID.
