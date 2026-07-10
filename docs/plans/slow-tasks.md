@@ -32,5 +32,5 @@ This queue is for scheduled slow-progress runs. Each run should implement at mos
 - [x] Enable and wire the URL input form in the main web app (port 5174) to call `POST /jobs` on submit and show the resulting job ID.
 - [x] Add a polling hook in the main web app that periodically calls `GET /jobs/{id}` and shows active job status.
 - [x] Add `GET /library/audio` returning a JSON list of MP3 files in `library/audio`.
-- [ ] Wire the main web app library audio card to `GET /library/audio` so it lists actual audio items.
+- [x] Wire the main web app library audio card to `GET /library/audio` so it lists actual audio items.
 - [ ] Update `docs/API.md` documenting the `/jobs` and `/jobs/{id}` endpoints (method, fields, example responses).

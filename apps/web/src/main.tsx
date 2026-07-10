@@ -4,6 +4,7 @@ import './styles.css';
 
 const API_BASE_URL = 'http://127.0.0.1:8787';
 const LIBRARY_SUMMARY_URL = `${API_BASE_URL}/library/summary`;
+const LIBRARY_AUDIO_URL = `${API_BASE_URL}/library/audio`;
 const JOBS_URL = `${API_BASE_URL}/jobs`;
 const JOB_POLL_INTERVAL_MS = 2000;
 const TERMINAL_STATUSES = new Set(['completed', 'failed']);
@@ -14,6 +15,14 @@ interface LibrarySummary {
   video: number;
   uploads: number;
   thumbnails: number;
+}
+
+interface AudioItem {
+  name: string;
+}
+
+interface AudioListResponse {
+  items: AudioItem[];
 }
 
 interface JobResponse {
@@ -105,8 +114,43 @@ function useLibrarySummary() {
   return { state, summary };
 }
 
+/**
+ * Fetch the list of MP3 files in the audio library via `GET /library/audio`.
+ * Returns the list of audio items plus a loading flag.
+ */
+function useLibraryAudio() {
+  const [items, setItems] = useState<AudioItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    fetch(LIBRARY_AUDIO_URL)
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = (await res.json()) as AudioListResponse;
+        if (cancelled) return;
+        setItems(data.items);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setItems([]);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return { items, loading };
+}
+
 function App() {
   const { state, summary } = useLibrarySummary();
+  const { items: audioItems, loading: audioLoading } = useLibraryAudio();
   const [url, setUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -210,7 +254,22 @@ function App() {
         </div>
       </section>
       <section className="cards">
-        <article><h2>Audio</h2><p>MP3 downloads will appear here.</p></article>
+        <article>
+          <h2>Audio</h2>
+          {audioLoading ? (
+            <p>Loading audio library…</p>
+          ) : audioItems.length === 0 ? (
+            <p>MP3 downloads will appear here.</p>
+          ) : (
+            <ul className="audio-list">
+              {audioItems.map((item) => (
+                <li key={item.name} className="audio-item">
+                  {item.name}
+                </li>
+              ))}
+            </ul>
+          )}
+        </article>
         <article><h2>Video</h2><p>MP4 library support is planned after audio.</p></article>
         <article><h2>Collections</h2><p>Anime, Hololive, OST, mood lists, and custom tags.</p></article>
       </section>
