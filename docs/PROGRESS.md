@@ -95,3 +95,9 @@
 - Task: implemented `GET /jobs/{id}` in `apps/api/app/routes/jobs.py` returning job status (404 with "Job not found" for unknown ids) plus two new tests in `tests/test_jobs.py`.
 - Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_jobs.py -q` — 5 passed.
 - Next small step: enable and wire the URL input form in the main web app (port 5174) to call `POST /jobs` on submit and show the resulting job ID.
+
+## 2026-07-10 15:08 SEAST — Slow Builder
+
+- Task: enabled and wired the URL input form in the main web app (`apps/web/src/main.tsx`) to call `POST /jobs` on submit; shows the created job ID (pending) or an error note, with submitting state and new `.job-note` styles.
+- Verification: `cd apps/web && npm run build` — built successfully (tsc + vite), 15 modules transformed.
+- Next small step: add a polling hook in the main web app that periodically calls `GET /jobs/{id}` and shows active job status.
