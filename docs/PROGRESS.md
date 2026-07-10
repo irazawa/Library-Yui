@@ -107,3 +107,9 @@
 - Task: added a `useJobStatus` polling hook in the main web app (`apps/web/src/main.tsx`) that calls `GET /jobs/{id}` every 2 seconds once a job id exists, auto-stops on terminal statuses (completed/failed), and renders the live status in the job note with error handling; added matching `.job-status` / `.job-status-error` styles.
 - Verification: `cd apps/web && npm run build` — built successfully (tsc + vite), 15 modules transformed.
 - Next small step: add `GET /library/audio` returning a JSON list of MP3 files in `library/audio`.
+
+## 2026-07-11 SEAST — Slow Builder (library audio list endpoint)
+
+- Task: added `GET /library/audio` endpoint (`apps/api/app/routes/library.py`) returning a JSON list of MP3 file names in `library/audio` via `AudioListResponse`/`AudioItem`; filters to `.mp3` only, sorted, and returns `{"items": []}` when the directory is missing. Added two tests in `tests/test_library.py` (mp3 filtering + empty/missing dir).
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_library.py -q` — 4 passed.
+- Next small step: wire the main web app library audio card to `GET /library/audio` so it lists actual audio items.

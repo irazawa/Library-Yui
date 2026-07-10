@@ -3,7 +3,7 @@ from pathlib import Path
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from app.storage import STORAGE_DIRS
+from app.storage import AUDIO_DIR, STORAGE_DIRS
 
 router = APIRouter(tags=["library"])
 
@@ -13,6 +13,14 @@ class LibrarySummaryResponse(BaseModel):
     video: int
     uploads: int
     thumbnails: int
+
+
+class AudioItem(BaseModel):
+    name: str
+
+
+class AudioListResponse(BaseModel):
+    items: list[AudioItem]
 
 
 def _count_files(directory: Path) -> int:
@@ -31,3 +39,22 @@ def _count_files(directory: Path) -> int:
 def get_library_summary() -> LibrarySummaryResponse:
     counts = {name: _count_files(path) for name, path in STORAGE_DIRS.items()}
     return LibrarySummaryResponse(**counts)
+
+
+@router.get("/library/audio", response_model=AudioListResponse)
+def list_audio() -> AudioListResponse:
+    """Return the names of MP3 files in the audio library folder.
+
+    Missing directories return an empty list so the endpoint works before
+    any downloads have happened.
+    """
+
+    if not AUDIO_DIR.is_dir():
+        return AudioListResponse(items=[])
+
+    items = [
+        AudioItem(name=entry.name)
+        for entry in sorted(AUDIO_DIR.iterdir())
+        if entry.is_file() and entry.suffix.lower() == ".mp3"
+    ]
+    return AudioListResponse(items=items)
