@@ -101,3 +101,9 @@
 - Task: enabled and wired the URL input form in the main web app (`apps/web/src/main.tsx`) to call `POST /jobs` on submit; shows the created job ID (pending) or an error note, with submitting state and new `.job-note` styles.
 - Verification: `cd apps/web && npm run build` — built successfully (tsc + vite), 15 modules transformed.
 - Next small step: add a polling hook in the main web app that periodically calls `GET /jobs/{id}` and shows active job status.
+
+## 2026-07-10 SEAST — Slow Builder (web job polling hook)
+
+- Task: added a `useJobStatus` polling hook in the main web app (`apps/web/src/main.tsx`) that calls `GET /jobs/{id}` every 2 seconds once a job id exists, auto-stops on terminal statuses (completed/failed), and renders the live status in the job note with error handling; added matching `.job-status` / `.job-status-error` styles.
+- Verification: `cd apps/web && npm run build` — built successfully (tsc + vite), 15 modules transformed.
+- Next small step: add `GET /library/audio` returning a JSON list of MP3 files in `library/audio`.

@@ -1,10 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 
 const API_BASE_URL = 'http://127.0.0.1:8787';
 const LIBRARY_SUMMARY_URL = `${API_BASE_URL}/library/summary`;
 const JOBS_URL = `${API_BASE_URL}/jobs`;
+const JOB_POLL_INTERVAL_MS = 2000;
+const TERMINAL_STATUSES = new Set(['completed', 'failed']);
 
 type SummaryState = 'loading' | 'ok' | 'error';
 interface LibrarySummary {
@@ -12,6 +14,67 @@ interface LibrarySummary {
   video: number;
   uploads: number;
   thumbnails: number;
+}
+
+interface JobResponse {
+  id: string;
+  url: string;
+  status: string;
+}
+
+/**
+ * Poll `GET /jobs/{id}` on an interval until the job reaches a terminal
+ * status (completed/failed) or polling is cleared. Returns the latest known
+ * status string, or null when no job is being tracked.
+ */
+function useJobStatus(jobId: string | null) {
+  const [jobStatus, setJobStatus] = useState<string | null>(null);
+  const [jobPollError, setJobPollError] = useState<string | null>(null);
+  const timerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (timerRef.current !== null) {
+      window.clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    if (!jobId) {
+      setJobStatus(null);
+      setJobPollError(null);
+      return;
+    }
+    let cancelled = false;
+    setJobStatus('pending');
+    setJobPollError(null);
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`${JOBS_URL}/${jobId}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const job = (await res.json()) as JobResponse;
+        if (cancelled) return;
+        setJobStatus(job.status);
+        if (TERMINAL_STATUSES.has(job.status) && timerRef.current !== null) {
+          window.clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+      } catch (err) {
+        if (cancelled) return;
+        setJobPollError(err instanceof Error ? err.message : 'Poll failed');
+      }
+    };
+    poll();
+    timerRef.current = window.setInterval(poll, JOB_POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      if (timerRef.current !== null) {
+        window.clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [jobId]);
+
+  return { jobStatus, jobPollError };
 }
 
 function useLibrarySummary() {
@@ -48,6 +111,7 @@ function App() {
   const [submitting, setSubmitting] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobError, setJobError] = useState<string | null>(null);
+  const { jobStatus, jobPollError } = useJobStatus(jobId);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -108,7 +172,12 @@ function App() {
         </form>
         {jobId && (
           <p className="job-note" role="status">
-            Job created: <code>{jobId}</code> (pending)
+            Job created: <code>{jobId}</code> — status:{' '}
+            <strong className="job-status">{jobStatus ?? 'pending'}</strong>
+            {jobStatus && !TERMINAL_STATUSES.has(jobStatus) && '…'}
+            {jobPollError && (
+              <span className="job-status-error"> (status update failed: {jobPollError})</span>
+            )}
           </p>
         )}
         {jobError && (
