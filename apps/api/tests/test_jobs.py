@@ -57,10 +57,46 @@ def test_get_job_returns_status():
     assert body["status"] == "pending"
 
 
-def test_get_job_unknown_id_returns_404():
+def test_get_job_unknown_id_returns_404() -> None:
     client = TestClient(app)
 
     response = client.get("/jobs/does-not-exist")
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Job not found"
+
+
+def test_create_job_rejects_non_youtube_url() -> None:
+    client = TestClient(app)
+
+    response = client.post(
+        "/jobs",
+        json={"url": "https://example.com/watch?v=abc"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Only YouTube URLs are accepted"
+
+
+def test_create_job_accepts_youtu_be_short_url() -> None:
+    client = TestClient(app)
+
+    response = client.post(
+        "/jobs",
+        json={"url": "https://youtu.be/dQw4w9WgXcQ"},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["status"] == "pending"
+
+
+def test_create_job_accepts_music_youtube_url() -> None:
+    client = TestClient(app)
+
+    response = client.post(
+        "/jobs",
+        json={"url": "https://music.youtube.com/watch?v=abc123"},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["status"] == "pending"

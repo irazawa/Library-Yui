@@ -16,11 +16,38 @@ class JobResponse(BaseModel):
     status: str
 
 
+def _is_youtube_url(url: str) -> bool:
+    """Return True when *url* points to a recognized YouTube host."""
+
+    lowered = url.lower()
+    return any(
+        host in lowered
+        for host in (
+            "youtube.com",
+            "www.youtube.com",
+            "m.youtube.com",
+            "youtu.be",
+            "www.youtu.be",
+            "music.youtube.com",
+        )
+    )
+
+
 @router.post("/jobs", response_model=JobResponse, status_code=status.HTTP_201_CREATED)
 def create_download_job(payload: JobCreateRequest) -> JobResponse:
-    """Accept a YouTube URL and initialize a pending download job."""
+    """Accept a YouTube URL and initialize a pending download job.
 
-    job = create_job(str(payload.url))
+    Non-YouTube URLs are rejected with HTTP 422.
+    """
+
+    url = str(payload.url)
+    if not _is_youtube_url(url):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Only YouTube URLs are accepted",
+        )
+
+    job = create_job(url)
     return JobResponse(**job)
 
 

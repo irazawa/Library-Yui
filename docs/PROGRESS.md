@@ -125,3 +125,9 @@
 - Task: updated `docs/API.md` documenting `GET /library/summary`, `GET /library/audio`, `POST /jobs` (request body, 201 response, job statuses table), and `GET /jobs/{id}` (200/404 responses, path params). All four new endpoint sections include field tables and curl examples. Also generated the next batch of 8 tiny tasks (fallback — `agy`/Gemini auth failed) targeting MVP 1 completion and the downloader port.
 - Verification: docs-only task — `git diff --check` clean (exit 0).
 - Next small step: add YouTube URL validation in `POST /jobs` rejecting non-YouTube URLs.
+
+## 2026-07-11 SEAST — Slow Builder (YouTube URL validation)
+
+- Task: added YouTube URL validation in `POST /jobs` (`apps/api/app/routes/jobs.py`) via `_is_youtube_url()` helper — accepts `youtube.com`, `www.youtube.com`, `m.youtube.com`, `music.youtube.com`, and `youtu.be` hosts; rejects all other URLs with HTTP 422 ("Only YouTube URLs are accepted"). Added 3 new tests in `tests/test_jobs.py` (reject non-YouTube example.com, accept youtu.be short URL, accept music.youtube.com).
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_jobs.py -q` — 8 passed.
+- Next small step: add `POST /jobs/{id}/start` stub endpoint that transitions a job from `pending` to `downloading`.

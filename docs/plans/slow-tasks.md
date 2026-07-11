@@ -37,7 +37,7 @@ This queue is for scheduled slow-progress runs. Each run should implement at mos
 
 ## Next batch (generated 2026-07-11 via fallback — Gemini auth failed)
 
-- [ ] Add a `DOWNLOADABLE` validation in `POST /jobs` that rejects non-YouTube URLs with a 422/400 error.
+- [x] Add a `DOWNLOADABLE` validation in `POST /jobs` that rejects non-YouTube URLs with a 422/400 error.
 - [ ] Add a `POST /jobs/{id}/start` stub endpoint that transitions a job from `pending` to `downloading` (no real download yet).
 - [ ] Add a `POST /jobs/{id}/complete` stub endpoint that transitions a job to `completed` (placeholder, no file yet).
 - [ ] Add a job lifecycle test suite covering pending → downloading → completed transitions.
