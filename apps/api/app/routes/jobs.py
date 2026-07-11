@@ -79,3 +79,23 @@ def start_download_job(job_id: str) -> JobResponse:
         if updated is not None:
             return JobResponse(**updated)
     return JobResponse(**job)
+
+
+@router.post("/jobs/{job_id}/complete", response_model=JobResponse)
+def complete_download_job(job_id: str) -> JobResponse:
+    """Transition a job to ``completed``.
+
+    This is a stub endpoint: no file is produced yet. A job that is already
+    ``completed`` is left untouched and returned as-is so callers remain
+    idempotent. A job in a terminal ``failed`` state is also left untouched.
+    Unknown job ids return 404.
+    """
+
+    job = get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    if job["status"] in ("pending", "downloading"):
+        updated = update_job_status(job_id, "completed")
+        if updated is not None:
+            return JobResponse(**updated)
+    return JobResponse(**job)
