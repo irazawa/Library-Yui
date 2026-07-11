@@ -33,4 +33,15 @@ This queue is for scheduled slow-progress runs. Each run should implement at mos
 - [x] Add a polling hook in the main web app that periodically calls `GET /jobs/{id}` and shows active job status.
 - [x] Add `GET /library/audio` returning a JSON list of MP3 files in `library/audio`.
 - [x] Wire the main web app library audio card to `GET /library/audio` so it lists actual audio items.
-- [ ] Update `docs/API.md` documenting the `/jobs` and `/jobs/{id}` endpoints (method, fields, example responses).
+- [x] Update `docs/API.md` documenting the `/jobs` and `/jobs/{id}` endpoints (method, fields, example responses).
+
+## Next batch (generated 2026-07-11 via fallback — Gemini auth failed)
+
+- [ ] Add a `DOWNLOADABLE` validation in `POST /jobs` that rejects non-YouTube URLs with a 422/400 error.
+- [ ] Add a `POST /jobs/{id}/start` stub endpoint that transitions a job from `pending` to `downloading` (no real download yet).
+- [ ] Add a `POST /jobs/{id}/complete` stub endpoint that transitions a job to `completed` (placeholder, no file yet).
+- [ ] Add a job lifecycle test suite covering pending → downloading → completed transitions.
+- [ ] Add a `GET /jobs` list endpoint returning all jobs (id, url, status) from the in-memory store.
+- [ ] Add a status dashboard card that polls `GET /jobs` and shows a live count of active/recent jobs.
+- [ ] Port the core MP3 download logic from `C:/games/music/Downloader.py` into a `app/downloader.py` module behind a feature flag (no wiring yet).
+- [ ] Wire the real downloader into the `/jobs` flow so a created job actually downloads an MP3 into `library/audio/` (flag-gated).
