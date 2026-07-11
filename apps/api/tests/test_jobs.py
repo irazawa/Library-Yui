@@ -100,3 +100,45 @@ def test_create_job_accepts_music_youtube_url() -> None:
 
     assert response.status_code == 201
     assert response.json()["status"] == "pending"
+
+
+def test_start_job_transitions_pending_to_downloading() -> None:
+    client = TestClient(app)
+
+    created = client.post(
+        "/jobs",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"},
+    ).json()
+    job_id = created["id"]
+
+    response = client.post(f"/jobs/{job_id}/start")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id"] == job_id
+    assert body["status"] == "downloading"
+
+
+def test_start_job_is_idempotent_when_already_downloading() -> None:
+    client = TestClient(app)
+
+    created = client.post(
+        "/jobs",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"},
+    ).json()
+    job_id = created["id"]
+
+    client.post(f"/jobs/{job_id}/start")
+    second = client.post(f"/jobs/{job_id}/start")
+
+    assert second.status_code == 200
+    assert second.json()["status"] == "downloading"
+
+
+def test_start_job_unknown_id_returns_404() -> None:
+    client = TestClient(app)
+
+    response = client.post("/jobs/does-not-exist/start")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Job not found"

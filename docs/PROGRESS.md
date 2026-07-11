@@ -131,3 +131,9 @@
 - Task: added YouTube URL validation in `POST /jobs` (`apps/api/app/routes/jobs.py`) via `_is_youtube_url()` helper — accepts `youtube.com`, `www.youtube.com`, `m.youtube.com`, `music.youtube.com`, and `youtu.be` hosts; rejects all other URLs with HTTP 422 ("Only YouTube URLs are accepted"). Added 3 new tests in `tests/test_jobs.py` (reject non-YouTube example.com, accept youtu.be short URL, accept music.youtube.com).
 - Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_jobs.py -q` — 8 passed.
 - Next small step: add `POST /jobs/{id}/start` stub endpoint that transitions a job from `pending` to `downloading`.
+
+## 2026-07-11 SEAST — Slow Builder (jobs/{id}/start stub)
+
+- Task: added `POST /jobs/{id}/start` stub endpoint (`apps/api/app/routes/jobs.py`) that transitions a job from `pending` to `downloading` (no real download yet). Idempotent — re-calling on an already-downloading job leaves it untouched. Unknown ids return 404. Added `update_job_status()` helper to `app/jobs.py`. Added 3 tests in `tests/test_jobs.py` (transition pending→downloading, idempotency, unknown id 404).
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_jobs.py -q` — 11 passed.
+- Next small step: add `POST /jobs/{id}/complete` stub endpoint that transitions a job to `completed`.

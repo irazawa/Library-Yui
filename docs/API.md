@@ -197,6 +197,44 @@ Returned when no job exists for the given `job_id`.
 curl http://127.0.0.1:8787/jobs/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
 ```
 
+## `POST /jobs/{job_id}/start`
+
+Transitions a job from `pending` to `downloading`. This is currently a stub —
+no real download is performed yet. The call is idempotent: re-invoking it on an
+already-`downloading` or terminal-state job returns the current record unchanged.
+
+### Path parameters
+
+| Parameter | Type   | Description                       |
+| --------- | ------ | --------------------------------- |
+| `job_id`  | string | The UUID hex of the job to start. |
+
+### Response — `200 OK`
+
+```json
+{
+  "id": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+  "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+  "status": "downloading"
+}
+```
+
+### Response — `404 Not Found`
+
+Returned when no job exists for the given `job_id`.
+
+```json
+{
+  "detail": "Job not found"
+}
+```
+
+### Example
+
+```bash
+curl -X POST http://127.0.0.1:8787/jobs/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4/start
+```
+
 ## Notes
 
 - Read-only endpoints (`GET`) require no authentication.

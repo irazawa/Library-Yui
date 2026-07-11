@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, HttpUrl
 
-from app.jobs import create_job, get_job
+from app.jobs import create_job, get_job, update_job_status
 
 router = APIRouter(tags=["jobs"])
 
@@ -58,4 +58,24 @@ def get_download_job(job_id: str) -> JobResponse:
     job = get_job(job_id)
     if job is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    return JobResponse(**job)
+
+
+@router.post("/jobs/{job_id}/start", response_model=JobResponse)
+def start_download_job(job_id: str) -> JobResponse:
+    """Transition a job from ``pending`` to ``downloading``.
+
+    This is a stub endpoint: no real download is performed yet. A job that is
+    already ``downloading`` or has reached a terminal state (``completed`` /
+    ``failed``) is left untouched and returned as-is so callers remain
+    idempotent. Unknown job ids return 404.
+    """
+
+    job = get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    if job["status"] == "pending":
+        updated = update_job_status(job_id, "downloading")
+        if updated is not None:
+            return JobResponse(**updated)
     return JobResponse(**job)

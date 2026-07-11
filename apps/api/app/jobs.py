@@ -37,6 +37,19 @@ def get_job(job_id: str) -> JobRecord | None:
     return _JOBS.get(job_id)
 
 
+def update_job_status(job_id: str, new_status: str) -> JobRecord | None:
+    """Set the status of an existing job.
+
+    Returns the updated job record, or ``None`` when the job does not exist.
+    """
+
+    job = _JOBS.get(job_id)
+    if job is None:
+        return None
+    job["status"] = new_status
+    return job
+
+
 def reset_jobs() -> None:
     """Clear all jobs. Intended for tests."""
 
