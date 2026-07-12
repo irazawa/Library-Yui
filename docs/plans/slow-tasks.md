@@ -45,3 +45,15 @@ This queue is for scheduled slow-progress runs. Each run should implement at mos
 - [x] Add a status dashboard card that polls `GET /jobs` and shows a live count of active/recent jobs.
 - [x] Port the core MP3 download logic from `C:/games/music/Downloader.py` into a `app/downloader.py` module behind a feature flag (no wiring yet).
 - [x] Wire the real downloader into the `/jobs` flow so a created job actually downloads an MP3 into `library/audio/` (flag-gated).
+
+## Next batch (generated 2026-07-13 via Gemini 3.5 Flash)
+
+- [ ] Set up SQLite database initialization logic for `apps/api/data/library.db` and create a `metadata` table.
+- [ ] Add unit/integration tests for SQLite database initialization and basic CRUD operations on metadata.
+- [ ] Add `POST /library/upload` API endpoint accepting multipart file uploads and saving to `library/uploads/`.
+- [ ] Record upload metadata (filename, path, size, content type, uploaded_at) in the SQLite database upon upload.
+- [ ] Add integration tests for `POST /library/upload` verifying filesystem write and database insert.
+- [ ] Add `GET /library/uploads` API endpoint returning a list of all uploaded items from the SQLite database.
+- [ ] Add a file upload UI component (drag-and-drop or file selector) in the main web app to upload files.
+- [ ] Wire the main web app Uploads list to display uploaded files fetched from `GET /library/uploads`.
+- [ ] Update `docs/API.md` with descriptions and examples for `POST /library/upload` and `GET /library/uploads`.
