@@ -160,4 +160,10 @@
 
 - Task: added a Jobs card to the status dashboard (`apps/status/src/main.tsx` + `styles.css`) that polls `GET /jobs` every 5 seconds via a `useJobs` hook, and renders a live count breakdown (pending / downloading / completed / failed) plus a total + active summary. Includes error handling when the API is unreachable and color-coded status dots. Also updated the dashboard footer to reflect the next milestone step.
 - Verification: `cd apps/status && npm run build` — built successfully (tsc + vite), 15 modules transformed.
-- Next small step: port the core MP3 download logic from `C:/games/music/Downloader.py` into an `app/downloader.py` module behind a feature flag (no wiring yet).
+- Next small step: port the core MP3 download logic from `C:/games/music/Downloader.py` into a `app/downloader.py` module behind a feature flag (no wiring yet).
+
+## 2026-07-13 SEAST — Slow Builder (downloader module + feature flag)
+
+- Task: created `apps/api/app/downloader.py` porting the core MP3 download logic from `C:/games/music/Downloader.py` — `build_mp3_command()` builds the yt-dlp argv using the legacy conventions (best-audio `ba/b`, `-x`, `--audio-format mp3`, `--audio-quality 3`, `--no-playlist`, `--ignore-errors`, `-N 8`, output template `<dir>/%(title)s.%(ext)s`). Real downloads are gated behind the `LIBRARY_YUI_DOWNLOADS_ENABLED` env flag (disabled by default); `download_mp3()` raises `RuntimeError` unless the flag is set. Module is self-contained and not wired into the job flow yet. Added `tests/test_downloader.py` (14 tests covering flag on/off, command conventions, default output dir, disabled-raises, and enabled-invokes-subprocess via monkeypatched `subprocess.run`).
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_downloader.py -q` — 16 passed.
+- Next small step: wire the real downloader into the `/jobs` flow so a created job actually downloads an MP3 into `library/audio/` (flag-gated).
