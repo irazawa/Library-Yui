@@ -173,3 +173,9 @@
 - Task: wired the real downloader module into the `/jobs` flow so that a started job actually downloads an MP3 into `library/audio/` (when `LIBRARY_YUI_DOWNLOADS_ENABLED` is set to `1`). When disabled, `/jobs/{job_id}/start` falls back to stub behavior.
 - Verification: added 4 new unit and integration tests in `tests/test_jobs.py` covering successful download completion, download failures, exception/error handling, and disabled flag check; ran `$env:PYTHONPATH=""; $env:PYTHONNOUSERSITE="1"; .venv\Scripts\python -m pytest` with 43/43 tests passing.
 - Next small step: commit the completed MVP 1 audio downloader, then generate the plan for MVP 2 (Uploads) and add the first task to the slow-tasks queue.
+
+## 2026-07-13 SEAST — Slow Builder (SQLite database init + metadata table)
+
+- Task: created `apps/api/app/database.py` setting up SQLite database initialization for `apps/api/data/library.db` (first MVP 2 / Uploads task). `init_db()` lazily creates the `metadata` table (id, filename, path, size, content_type, uploaded_at) if missing and is idempotent. Also added `get_connection()`, `insert_metadata()`, and `list_metadata()` helpers plus `DEFAULT_DB_PATH`/`DATA_DIR` constants, all overridable per-call so tests can target a tmp dir. Added `tests/test_database.py` (11 tests: file creation, table/columns, idempotency, parent dir creation, insert returns id, field persistence, newest-first ordering, empty list, nullable content_type).
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest -q` — 53 passed (full suite, 10 new tests). No `.db` files staged (gitignore covers `apps/api/data/*.db`; tests use tmp_path).
+- Next small step: add unit/integration tests for SQLite database initialization and basic CRUD operations on metadata (largely covered, but can be expanded for edge cases).
