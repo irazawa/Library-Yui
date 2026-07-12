@@ -143,3 +143,9 @@
 - Task: added `POST /jobs/{id}/complete` stub endpoint (`apps/api/app/routes/jobs.py`) that transitions a job from `pending`/`downloading` to `completed` (no file produced yet). Idempotent — re-calling on an already-completed job leaves it untouched; a `failed` job is also left untouched. Unknown ids return 404. Added 3 tests in `tests/test_jobs.py` (transition downloading→completed, idempotency, unknown id 404).
 - Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_jobs.py -q` — 14 passed.
 - Next small step: add a job lifecycle test suite covering pending → downloading → completed transitions.
+
+## 2026-07-12 09:56 SEAST — Slow Builder (job lifecycle test suite)
+
+- Task: added `test_job_lifecycle_pending_to_downloading_to_completed` to `apps/api/tests/test_jobs.py` — a single happy-path sequence covering the full lifecycle of one job: `pending` (create) → `downloading` (POST `/jobs/{id}/start`) → `completed` (POST `/jobs/{id}/complete`), with GET status assertions between transitions to document the lifecycle contract in one place.
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_jobs.py -q` — 15 passed.
+- Next small step: add a `GET /jobs` list endpoint returning all jobs (id, url, status) from the in-memory store.

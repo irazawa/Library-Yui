@@ -40,7 +40,7 @@ This queue is for scheduled slow-progress runs. Each run should implement at mos
 - [x] Add a `DOWNLOADABLE` validation in `POST /jobs` that rejects non-YouTube URLs with a 422/400 error.
 - [x] Add a `POST /jobs/{id}/start` stub endpoint that transitions a job from `pending` to `downloading` (no real download yet).
 - [x] Add a `POST /jobs/{id}/complete` stub endpoint that transitions a job to `completed` (placeholder, no file yet).
-- [ ] Add a job lifecycle test suite covering pending → downloading → completed transitions.
+- [x] Add a job lifecycle test suite covering pending → downloading → completed transitions.
 - [ ] Add a `GET /jobs` list endpoint returning all jobs (id, url, status) from the in-memory store.
 - [ ] Add a status dashboard card that polls `GET /jobs` and shows a live count of active/recent jobs.
 - [ ] Port the core MP3 download logic from `C:/games/music/Downloader.py` into a `app/downloader.py` module behind a feature flag (no wiring yet).

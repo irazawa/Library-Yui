@@ -186,3 +186,48 @@ def test_complete_job_unknown_id_returns_404() -> None:
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Job not found"
+
+
+def test_job_lifecycle_pending_to_downloading_to_completed() -> None:
+    """Cover the full happy-path lifecycle of a single job in one sequence.
+
+    The job is created as ``pending``, transitioned to ``downloading`` via
+    ``POST /jobs/{id}/start``, and finally transitioned to ``completed`` via
+    ``POST /jobs/{id}/complete``. Each step asserts both the response status
+    code and the returned job status so the lifecycle contract is documented
+    in one place.
+    """
+
+    client = TestClient(app)
+
+    # Step 1 — create a pending job.
+    created = client.post(
+        "/jobs",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"},
+    ).json()
+    job_id = created["id"]
+    assert created["status"] == "pending"
+
+    # A freshly created job should still read as pending before any transition.
+    fresh = client.get(f"/jobs/{job_id}").json()
+    assert fresh["status"] == "pending"
+
+    # Step 2 — pending → downloading.
+    started = client.post(f"/jobs/{job_id}/start")
+    assert started.status_code == 200
+    assert started.json()["status"] == "downloading"
+
+    # GET should reflect the new status.
+    after_start = client.get(f"/jobs/{job_id}").json()
+    assert after_start["status"] == "downloading"
+
+    # Step 3 — downloading → completed.
+    completed = client.post(f"/jobs/{job_id}/complete")
+    assert completed.status_code == 200
+    assert completed.json()["status"] == "completed"
+
+    # The final GET should show the terminal status.
+    after_complete = client.get(f"/jobs/{job_id}").json()
+    assert after_complete["status"] == "completed"
+    assert after_complete["id"] == job_id
+    assert after_complete["url"] == created["url"]
