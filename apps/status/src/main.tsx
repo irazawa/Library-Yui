@@ -3,7 +3,90 @@ import { createRoot } from 'react-dom/client';
 import './styles.css';
 
 const HEALTH_URL = 'http://127.0.0.1:8787/health';
+const JOBS_URL = 'http://127.0.0.1:8787/jobs';
 const GITHUB_URL = 'https://github.com/irazawa/Library-Yui';
+
+type JobStatus = 'pending' | 'downloading' | 'completed' | 'failed';
+interface JobItem {
+  id: string;
+  url: string;
+  status: JobStatus;
+}
+
+function countByStatus(items: JobItem[]): Record<JobStatus, number> {
+  const base: Record<JobStatus, number> = {
+    pending: 0,
+    downloading: 0,
+    completed: 0,
+    failed: 0,
+  };
+  for (const item of items) {
+    if (item.status in base) base[item.status] += 1;
+  }
+  return base;
+}
+
+function useJobs(intervalMs = 5000) {
+  const [items, setItems] = useState<JobItem[]>([]);
+  const [error, setError] = useState<string>('');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function poll() {
+      try {
+        const res = await fetch(JOBS_URL);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        const next = Array.isArray(data?.items) ? (data.items as JobItem[]) : [];
+        setItems(next);
+        setError('');
+      } catch (err) {
+        if (cancelled) return;
+        const msg = err instanceof Error ? err.message : 'unreachable';
+        setError(msg);
+      }
+    }
+
+    poll();
+    const timer = window.setInterval(poll, intervalMs);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [intervalMs]);
+
+  return { items, error };
+}
+
+function JobsCard() {
+  const { items, error } = useJobs();
+  const counts = countByStatus(items);
+  const total = items.length;
+  const active = counts.pending + counts.downloading;
+
+  return (
+    <article className="jobs-card">
+      <strong>Jobs</strong>
+      {error ? (
+        <span className="jobs-error">Failed to load: {error}</span>
+      ) : (
+        <>
+          <span className="jobs-total">
+            {total} total · {active} active
+          </span>
+          <ul className="jobs-breakdown">
+            <li><span className="jobs-dot" data-status="pending" /> Pending: {counts.pending}</li>
+            <li><span className="jobs-dot" data-status="downloading" /> Downloading: {counts.downloading}</li>
+            <li><span className="jobs-dot" data-status="completed" /> Completed: {counts.completed}</li>
+            <li><span className="jobs-dot" data-status="failed" /> Failed: {counts.failed}</li>
+          </ul>
+        </>
+      )}
+    </article>
+  );
+}
 
 const roadmap = [
   ['MVP 0', 'Scaffold repo, API, web shell, status dashboard'],
@@ -84,6 +167,7 @@ function App() {
       </header>
       <section className="grid">
         <HealthCard />
+        <JobsCard />
         <GithubCard />
         {roadmap.map(([title, text]) => (
           <article key={title}>
@@ -92,7 +176,7 @@ function App() {
           </article>
         ))}
       </section>
-      <footer>Next small step: wire a real download job API endpoint behind the URL form shell.</footer>
+      <footer>Next small step: port core MP3 download logic from the legacy Downloader.py into an app/downloader.py module behind a feature flag.</footer>
     </main>
   );
 }

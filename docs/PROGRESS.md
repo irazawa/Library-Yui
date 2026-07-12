@@ -155,3 +155,9 @@
 - Task: added `GET /jobs` list endpoint (`apps/api/app/routes/jobs.py`) returning all jobs (id, url, status) from the in-memory store as `{"items": [...]}` in creation order. Added `list_jobs()` helper to `app/jobs.py` and a `JobListResponse` model. Registered the collection route before `/jobs/{job_id}` to avoid path ambiguity. Added 2 tests in `tests/test_jobs.py` (empty list returns `{"items": []}`; multiple created jobs returned in insertion order).
 - Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_jobs.py -q` — 17 passed.
 - Next small step: add a status dashboard card that polls `GET /jobs` and shows a live count of active/recent jobs.
+
+## 2026-07-12 SEAST — Slow Builder (status dashboard jobs card)
+
+- Task: added a Jobs card to the status dashboard (`apps/status/src/main.tsx` + `styles.css`) that polls `GET /jobs` every 5 seconds via a `useJobs` hook, and renders a live count breakdown (pending / downloading / completed / failed) plus a total + active summary. Includes error handling when the API is unreachable and color-coded status dots. Also updated the dashboard footer to reflect the next milestone step.
+- Verification: `cd apps/status && npm run build` — built successfully (tsc + vite), 15 modules transformed.
+- Next small step: port the core MP3 download logic from `C:/games/music/Downloader.py` into an `app/downloader.py` module behind a feature flag (no wiring yet).
