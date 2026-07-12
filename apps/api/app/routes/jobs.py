@@ -1,7 +1,12 @@
+import logging
+
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, HttpUrl
 
+from app.downloader import download_mp3, is_downloads_enabled
 from app.jobs import create_job, get_job, list_jobs, update_job_status
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["jobs"])
 
@@ -80,9 +85,11 @@ def get_download_job(job_id: str) -> JobResponse:
 def start_download_job(job_id: str) -> JobResponse:
     """Transition a job from ``pending`` to ``downloading``.
 
-    This is a stub endpoint: no real download is performed yet. A job that is
-    already ``downloading`` or has reached a terminal state (``completed`` /
-    ``failed``) is left untouched and returned as-is so callers remain
+    When the real-download feature flag (``LIBRARY_YUI_DOWNLOADS_ENABLED``) is
+    enabled, this endpoint also runs the MP3 download synchronously and
+    transitions the job to ``completed`` (or ``failed``) accordingly. When the
+    flag is disabled this behaves as a stub: it only flips the status to
+    ``downloading`` and performs no real download, so callers remain
     idempotent. Unknown job ids return 404.
     """
 
@@ -92,8 +99,48 @@ def start_download_job(job_id: str) -> JobResponse:
     if job["status"] == "pending":
         updated = update_job_status(job_id, "downloading")
         if updated is not None:
-            return JobResponse(**updated)
+            return _maybe_run_download(job_id) or JobResponse(**updated)
     return JobResponse(**job)
+
+
+def _maybe_run_download(job_id: str) -> JobResponse | None:
+    """Run the real MP3 download for *job_id* when the flag is enabled.
+
+    Returns the updated :class:`JobResponse` when a download was attempted
+    (regardless of success/failure), or ``None`` when the flag is disabled so
+    the caller can fall back to the plain ``downloading`` response.
+    """
+
+    if not is_downloads_enabled():
+        return None
+
+    job = get_job(job_id)
+    if job is None:
+        return None
+
+    url = job["url"]
+    try:
+        result = download_mp3(url)
+    except Exception as exc:  # pragma: no cover - defensive guard
+        logger.exception("Download failed for job %s", job_id)
+        updated = update_job_status(job_id, "failed")
+        if updated is not None:
+            return JobResponse(**updated)
+        raise
+
+    if result["ok"]:
+        updated = update_job_status(job_id, "completed")
+    else:
+        logger.warning(
+            "Download returned non-zero exit code %s for job %s",
+            result.get("returncode"),
+            job_id,
+        )
+        updated = update_job_status(job_id, "failed")
+
+    if updated is not None:
+        return JobResponse(**updated)
+    return None
 
 
 @router.post("/jobs/{job_id}/complete", response_model=JobResponse)

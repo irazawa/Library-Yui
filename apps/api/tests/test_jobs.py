@@ -1,6 +1,9 @@
 from fastapi.testclient import TestClient
 
+from app import downloader as downloader_mod
+from app.downloader import DOWNLOADS_ENABLED_FLAG
 from app.jobs import reset_jobs
+from app.routes import jobs as jobs_routes
 from main import app
 
 
@@ -265,3 +268,111 @@ def test_job_lifecycle_pending_to_downloading_to_completed() -> None:
     assert after_complete["status"] == "completed"
     assert after_complete["id"] == job_id
     assert after_complete["url"] == created["url"]
+
+
+# ---------------------------------------------------------------------------
+# Real-download wiring (flag-gated) tests for POST /jobs/{id}/start
+# ---------------------------------------------------------------------------
+
+def test_start_job_runs_download_and_completes_when_flag_enabled(monkeypatch):
+    """When the download flag is on and download_mp3 succeeds, ``/start``
+    should run the real download and end the job in ``completed``."""
+
+    monkeypatch.setenv(DOWNLOADS_ENABLED_FLAG, "1")
+
+    captured = {}
+
+    def fake_download(url, output_dir=None):
+        captured["url"] = url
+        return {"ok": True, "returncode": 0, "command": ["yt-dlp", url]}
+
+    monkeypatch.setattr(jobs_routes, "download_mp3", fake_download)
+
+    client = TestClient(app)
+    created = client.post(
+        "/jobs",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"},
+    ).json()
+    job_id = created["id"]
+
+    response = client.post(f"/jobs/{job_id}/start")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "completed"
+    assert captured["url"] == created["url"]
+
+
+def test_start_job_marks_failed_when_download_returns_error(monkeypatch):
+    """When the download flag is on but download_mp3 reports failure (non-zero
+    exit), the job should end in ``failed``."""
+
+    monkeypatch.setenv(DOWNLOADS_ENABLED_FLAG, "1")
+
+    def fake_download(url, output_dir=None):
+        return {"ok": False, "returncode": 1, "command": ["yt-dlp", url]}
+
+    monkeypatch.setattr(jobs_routes, "download_mp3", fake_download)
+
+    client = TestClient(app)
+    created = client.post(
+        "/jobs",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"},
+    ).json()
+    job_id = created["id"]
+
+    response = client.post(f"/jobs/{job_id}/start")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "failed"
+
+
+def test_start_job_skips_download_when_flag_disabled(monkeypatch):
+    """When the flag is off, ``/start`` must NOT call download_mp3 and the job
+    stays in ``downloading`` (stub behavior)."""
+
+    monkeypatch.delenv(DOWNLOADS_ENABLED_FLAG, raising=False)
+
+    called = {"count": 0}
+
+    def fake_download(url, output_dir=None):
+        called["count"] += 1
+        return {"ok": True, "returncode": 0, "command": []}
+
+    monkeypatch.setattr(jobs_routes, "download_mp3", fake_download)
+
+    client = TestClient(app)
+    created = client.post(
+        "/jobs",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"},
+    ).json()
+    job_id = created["id"]
+
+    response = client.post(f"/jobs/{job_id}/start")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "downloading"
+    assert called["count"] == 0
+
+
+def test_start_job_marks_failed_when_download_raises(monkeypatch):
+    """When download_mp3 raises, the job should be marked ``failed`` and the
+    exception re-raised is avoided (the route catches it)."""
+
+    monkeypatch.setenv(DOWNLOADS_ENABLED_FLAG, "1")
+
+    def fake_download(url, output_dir=None):
+        raise RuntimeError("yt-dlp not found")
+
+    monkeypatch.setattr(jobs_routes, "download_mp3", fake_download)
+
+    client = TestClient(app)
+    created = client.post(
+        "/jobs",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"},
+    ).json()
+    job_id = created["id"]
+
+    response = client.post(f"/jobs/{job_id}/start")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "failed"

@@ -44,4 +44,4 @@ This queue is for scheduled slow-progress runs. Each run should implement at mos
 - [x] Add a `GET /jobs` list endpoint returning all jobs (id, url, status) from the in-memory store.
 - [x] Add a status dashboard card that polls `GET /jobs` and shows a live count of active/recent jobs.
 - [x] Port the core MP3 download logic from `C:/games/music/Downloader.py` into a `app/downloader.py` module behind a feature flag (no wiring yet).
-- [ ] Wire the real downloader into the `/jobs` flow so a created job actually downloads an MP3 into `library/audio/` (flag-gated).
+- [x] Wire the real downloader into the `/jobs` flow so a created job actually downloads an MP3 into `library/audio/` (flag-gated).

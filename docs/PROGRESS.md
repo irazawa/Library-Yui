@@ -167,3 +167,9 @@
 - Task: created `apps/api/app/downloader.py` porting the core MP3 download logic from `C:/games/music/Downloader.py` — `build_mp3_command()` builds the yt-dlp argv using the legacy conventions (best-audio `ba/b`, `-x`, `--audio-format mp3`, `--audio-quality 3`, `--no-playlist`, `--ignore-errors`, `-N 8`, output template `<dir>/%(title)s.%(ext)s`). Real downloads are gated behind the `LIBRARY_YUI_DOWNLOADS_ENABLED` env flag (disabled by default); `download_mp3()` raises `RuntimeError` unless the flag is set. Module is self-contained and not wired into the job flow yet. Added `tests/test_downloader.py` (14 tests covering flag on/off, command conventions, default output dir, disabled-raises, and enabled-invokes-subprocess via monkeypatched `subprocess.run`).
 - Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_downloader.py -q` — 16 passed.
 - Next small step: wire the real downloader into the `/jobs` flow so a created job actually downloads an MP3 into `library/audio/` (flag-gated).
+
+## 2026-07-13 SEAST — Slow Builder (downloader wired to jobs)
+
+- Task: wired the real downloader module into the `/jobs` flow so that a started job actually downloads an MP3 into `library/audio/` (when `LIBRARY_YUI_DOWNLOADS_ENABLED` is set to `1`). When disabled, `/jobs/{job_id}/start` falls back to stub behavior.
+- Verification: added 4 new unit and integration tests in `tests/test_jobs.py` covering successful download completion, download failures, exception/error handling, and disabled flag check; ran `$env:PYTHONPATH=""; $env:PYTHONNOUSERSITE="1"; .venv\Scripts\python -m pytest` with 43/43 tests passing.
+- Next small step: commit the completed MVP 1 audio downloader, then generate the plan for MVP 2 (Uploads) and add the first task to the slow-tasks queue.
