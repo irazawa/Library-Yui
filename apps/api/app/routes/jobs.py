@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, HttpUrl
 
-from app.jobs import create_job, get_job, update_job_status
+from app.jobs import create_job, get_job, list_jobs, update_job_status
 
 router = APIRouter(tags=["jobs"])
 
@@ -14,6 +14,10 @@ class JobResponse(BaseModel):
     id: str
     url: str
     status: str
+
+
+class JobListResponse(BaseModel):
+    items: list[JobResponse]
 
 
 def _is_youtube_url(url: str) -> bool:
@@ -49,6 +53,17 @@ def create_download_job(payload: JobCreateRequest) -> JobResponse:
 
     job = create_job(url)
     return JobResponse(**job)
+
+
+@router.get("/jobs", response_model=JobListResponse)
+def list_download_jobs() -> JobListResponse:
+    """Return all jobs (id, url, status) from the in-memory store.
+
+    Jobs are returned in creation order. The response shape is
+    ``{"items": [...]}`` mirroring the other collection endpoints.
+    """
+
+    return JobListResponse(items=[JobResponse(**job) for job in list_jobs()])
 
 
 @router.get("/jobs/{job_id}", response_model=JobResponse)

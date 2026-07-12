@@ -149,3 +149,9 @@
 - Task: added `test_job_lifecycle_pending_to_downloading_to_completed` to `apps/api/tests/test_jobs.py` — a single happy-path sequence covering the full lifecycle of one job: `pending` (create) → `downloading` (POST `/jobs/{id}/start`) → `completed` (POST `/jobs/{id}/complete`), with GET status assertions between transitions to document the lifecycle contract in one place.
 - Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_jobs.py -q` — 15 passed.
 - Next small step: add a `GET /jobs` list endpoint returning all jobs (id, url, status) from the in-memory store.
+
+## 2026-07-12 SEAST — Slow Builder (GET /jobs list endpoint)
+
+- Task: added `GET /jobs` list endpoint (`apps/api/app/routes/jobs.py`) returning all jobs (id, url, status) from the in-memory store as `{"items": [...]}` in creation order. Added `list_jobs()` helper to `app/jobs.py` and a `JobListResponse` model. Registered the collection route before `/jobs/{job_id}` to avoid path ambiguity. Added 2 tests in `tests/test_jobs.py` (empty list returns `{"items": []}`; multiple created jobs returned in insertion order).
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_jobs.py -q` — 17 passed.
+- Next small step: add a status dashboard card that polls `GET /jobs` and shows a live count of active/recent jobs.

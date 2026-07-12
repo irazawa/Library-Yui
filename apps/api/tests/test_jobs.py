@@ -188,6 +188,40 @@ def test_complete_job_unknown_id_returns_404() -> None:
     assert response.json()["detail"] == "Job not found"
 
 
+def test_list_jobs_returns_empty_when_none() -> None:
+    client = TestClient(app)
+
+    response = client.get("/jobs")
+
+    assert response.status_code == 200
+    assert response.json() == {"items": []}
+
+
+def test_list_jobs_returns_all_created_jobs() -> None:
+    client = TestClient(app)
+
+    first = client.post(
+        "/jobs",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"},
+    ).json()
+    second = client.post(
+        "/jobs",
+        json={"url": "https://youtu.be/abcdefghijk"},
+    ).json()
+
+    response = client.get("/jobs")
+
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert len(items) == 2
+    # Insertion order is preserved.
+    assert items[0]["id"] == first["id"]
+    assert items[1]["id"] == second["id"]
+    for item in items:
+        assert {"id", "url", "status"} == set(item.keys())
+        assert item["status"] == "pending"
+
+
 def test_job_lifecycle_pending_to_downloading_to_completed() -> None:
     """Cover the full happy-path lifecycle of a single job in one sequence.
 

@@ -31,6 +31,16 @@ def create_job(url: str) -> JobRecord:
     return job
 
 
+def list_jobs() -> list[JobRecord]:
+    """Return all jobs in insertion order.
+
+    The list reflects the order in which jobs were created. A future
+    iteration may add pagination or sorting by recency.
+    """
+
+    return list(_JOBS.values())
+
+
 def get_job(job_id: str) -> JobRecord | None:
     """Return a job by id, or ``None`` when it does not exist."""
 
