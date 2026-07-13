@@ -133,13 +133,21 @@ def upload_file(file: UploadFile) -> UploadResponse:
     finally:
         file.file.close()
 
-    row_id = database.insert_metadata(
-        filename=filename,
-        path=str(destination),
-        size=written,
-        content_type=content_type,
-        db_path=DB_PATH,
-    )
+    try:
+        row_id = database.insert_metadata(
+            filename=filename,
+            path=str(destination),
+            size=written,
+            content_type=content_type,
+            db_path=DB_PATH,
+        )
+    except Exception:
+        # If the metadata row cannot be recorded, remove the written file so
+        # we never leave an orphaned upload on disk that the library does not
+        # know about. The caller sees a 500; the filesystem stays consistent.
+        destination.unlink(missing_ok=True)
+        logger.exception("Failed to record metadata for %s", filename)
+        raise
 
     logger.info("Uploaded %s (%d bytes) as metadata row %d", filename, written, row_id)
 

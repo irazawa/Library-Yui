@@ -191,3 +191,9 @@
 - Task: added `POST /library/upload` API endpoint (`apps/api/app/routes/library.py`) accepting a multipart file upload (`UploadFile`), streaming it to `library/uploads/` in 64 KiB chunks, and recording a metadata row in the SQLite database (filename, path, size, content_type, uploaded_at). Enforces a 50 MiB size cap (HTTP 413) with partial-file cleanup on any error. Added `python-multipart==0.0.20` to `requirements.txt` (FastAPI dependency for multipart parsing). Added `tests/test_upload.py` (6 integration tests: successful upload + 201 + filesystem write + db row, metadata persistence, missing file field 422, filename with dots, empty file allowed, multiple uploads unique ids).
 - Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest -q` — 65 passed (full suite, 6 new). `tests/test_health.py` — 1 passed.
 - Next small step: record upload metadata (filename, path, size, content type, uploaded_at) in the SQLite database upon upload (already partially done — next task can refine/extend).
+
+## 2026-07-13 SEAST — Slow Builder (upload metadata reliability)
+
+- Task: hardened the "record upload metadata" path in `POST /library/upload` (`apps/api/app/routes/library.py`). The metadata insert is now wrapped so that if `insert_metadata` raises, the just-written upload file is removed (no orphan on disk) and the error is logged + re-raised. Added 2 tests in `tests/test_upload.py`: (1) `uploaded_at` is persisted as a parseable, timezone-aware ISO-8601 timestamp in the DB; (2) orphan-cleanup on simulated metadata-insert failure (file removed, no row recorded).
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_upload.py -q` — 9 passed. Full suite `pytest -q` — 67 passed (2 new).
+- Next small step: add integration tests for `POST /library/upload` verifying filesystem write and database insert (can expand on size-cap/rejection paths).

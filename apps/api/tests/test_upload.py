@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 import main as main_module
@@ -126,3 +127,51 @@ def test_upload_multiple_files_each_get_unique_row(monkeypatch, tmp_path):
     assert len(rows) == 2
     filenames = {r["filename"] for r in rows}
     assert filenames == {"a.mp3", "b.mp3"}
+
+
+def test_upload_persists_uploaded_at_timestamp(monkeypatch, tmp_path):
+    uploads_dir, db_path = _setup_isolated_storage(monkeypatch, tmp_path)
+
+    response = client.post(
+        "/library/upload",
+        files={"file": ("ts.mp3", b"data", "audio/mpeg")},
+    )
+
+    assert response.status_code == 201
+    from datetime import datetime
+
+    from app import database
+
+    rows = database.list_metadata(db_path)
+    assert len(rows) == 1
+    # uploaded_at must be a parseable ISO-8601 timestamp, not empty.
+    parsed = datetime.fromisoformat(rows[0]["uploaded_at"])
+    assert parsed.tzinfo is not None, "uploaded_at must be timezone-aware"
+
+
+def test_upload_removes_file_when_metadata_insert_fails(monkeypatch, tmp_path):
+    uploads_dir, db_path = _setup_isolated_storage(monkeypatch, tmp_path)
+
+    # Force the metadata insert to raise so we can verify the orphan-cleanup
+    # path: the uploaded file must be removed, not left behind on disk.
+    from app import database
+
+    def _boom(**kwargs):
+        raise RuntimeError("simulated db failure")
+
+    monkeypatch.setattr(database, "insert_metadata", _boom)
+    monkeypatch.setattr(library_route.database, "insert_metadata", _boom)
+
+    # TestClient re-raises server exceptions by default; the important
+    # contract under test is the filesystem side-effect (orphan cleanup),
+    # not the HTTP status code.
+    with pytest.raises(RuntimeError, match="simulated db failure"):
+        client.post(
+            "/library/upload",
+            files={"file": ("orphan.mp3", b"data", "audio/mpeg")},
+        )
+
+    # No orphan file must remain on disk.
+    assert not (uploads_dir / "orphan.mp3").exists()
+    # And no row must be recorded.
+    assert database.list_metadata(db_path) == []

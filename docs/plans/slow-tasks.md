@@ -51,7 +51,7 @@ This queue is for scheduled slow-progress runs. Each run should implement at mos
 - [x] Set up SQLite database initialization logic for `apps/api/data/library.db` and create a `metadata` table.
 - [x] Add unit/integration tests for SQLite database initialization and basic CRUD operations on metadata.
 - [x] Add `POST /library/upload` API endpoint accepting multipart file uploads and saving to `library/uploads/`.
-- [ ] Record upload metadata (filename, path, size, content type, uploaded_at) in the SQLite database upon upload.
+- [x] Record upload metadata (filename, path, size, content type, uploaded_at) in the SQLite database upon upload.
 - [ ] Add integration tests for `POST /library/upload` verifying filesystem write and database insert.
 - [ ] Add `GET /library/uploads` API endpoint returning a list of all uploaded items from the SQLite database.
 - [ ] Add a file upload UI component (drag-and-drop or file selector) in the main web app to upload files.
