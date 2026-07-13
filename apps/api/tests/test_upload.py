@@ -175,3 +175,55 @@ def test_upload_removes_file_when_metadata_insert_fails(monkeypatch, tmp_path):
     assert not (uploads_dir / "orphan.mp3").exists()
     # And no row must be recorded.
     assert database.list_metadata(db_path) == []
+
+
+def test_upload_rejects_file_exceeding_size_cap(monkeypatch, tmp_path):
+    """A payload over MAX_UPLOAD_BYTES is rejected with 413 and leaves no
+    partial file on disk and no metadata row in the database."""
+
+    uploads_dir, db_path = _setup_isolated_storage(monkeypatch, tmp_path)
+
+    # Payload slightly larger than the 50 MiB cap defined on the route.
+    from app.routes.library import MAX_UPLOAD_BYTES
+
+    overflow_size = MAX_UPLOAD_BYTES + 1024
+    payload = b"\0" * overflow_size
+
+    response = client.post(
+        "/library/upload",
+        files={"file": ("too_big.mp3", payload, "audio/mpeg")},
+    )
+
+    assert response.status_code == 413
+
+    # No partial upload may be left on disk.
+    assert not (uploads_dir / "too_big.mp3").exists()
+
+    # And no metadata row may have been recorded.
+    from app import database
+
+    assert database.list_metadata(db_path) == []
+
+
+def test_upload_writes_multichunk_file(monkeypatch, tmp_path):
+    """A payload larger than a single 64 KiB chunk is streamed across multiple
+    writes and reconstructed byte-for-byte on disk."""
+
+    uploads_dir, db_path = _setup_isolated_storage(monkeypatch, tmp_path)
+
+    # Three chunks worth of distinct bytes (> 64 KiB guarantees the route's
+    # chunked-read loop executes more than once).
+    payload = (b"AB" * 40 * 1024) + (b"CD" * 40 * 1024) + b"tail"
+    assert len(payload) > 64 * 1024
+
+    response = client.post(
+        "/library/upload",
+        files={"file": ("multi.mp3", payload, "audio/mpeg")},
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["size"] == len(payload)
+
+    written = (uploads_dir / "multi.mp3").read_bytes()
+    assert written == payload
