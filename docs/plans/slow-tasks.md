@@ -49,7 +49,7 @@ This queue is for scheduled slow-progress runs. Each run should implement at mos
 ## Next batch (generated 2026-07-13 via Gemini 3.5 Flash)
 
 - [x] Set up SQLite database initialization logic for `apps/api/data/library.db` and create a `metadata` table.
-- [ ] Add unit/integration tests for SQLite database initialization and basic CRUD operations on metadata.
+- [x] Add unit/integration tests for SQLite database initialization and basic CRUD operations on metadata.
 - [ ] Add `POST /library/upload` API endpoint accepting multipart file uploads and saving to `library/uploads/`.
 - [ ] Record upload metadata (filename, path, size, content type, uploaded_at) in the SQLite database upon upload.
 - [ ] Add integration tests for `POST /library/upload` verifying filesystem write and database insert.

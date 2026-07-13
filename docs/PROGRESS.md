@@ -179,3 +179,9 @@
 - Task: created `apps/api/app/database.py` setting up SQLite database initialization for `apps/api/data/library.db` (first MVP 2 / Uploads task). `init_db()` lazily creates the `metadata` table (id, filename, path, size, content_type, uploaded_at) if missing and is idempotent. Also added `get_connection()`, `insert_metadata()`, and `list_metadata()` helpers plus `DEFAULT_DB_PATH`/`DATA_DIR` constants, all overridable per-call so tests can target a tmp dir. Added `tests/test_database.py` (11 tests: file creation, table/columns, idempotency, parent dir creation, insert returns id, field persistence, newest-first ordering, empty list, nullable content_type).
 - Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest -q` — 53 passed (full suite, 10 new tests). No `.db` files staged (gitignore covers `apps/api/data/*.db`; tests use tmp_path).
 - Next small step: add unit/integration tests for SQLite database initialization and basic CRUD operations on metadata (largely covered, but can be expanded for edge cases).
+
+## 2026-07-13 SEAST — Slow Builder (database CRUD edge-case tests)
+
+- Task: expanded `apps/api/tests/test_database.py` with 6 new edge-case tests covering re-init data preservation (app restart simulation), plain-dict return type guarantee, strictly-increasing row ids, zero-size files, unicode filenames/paths, and `get_connection` parent-dir creation without `init_db`.
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest -q` — 59 passed (6 new). `tests/test_health.py` — 1 passed.
+- Next small step: add `POST /library/upload` API endpoint accepting multipart file uploads and saving to `library/uploads/`.

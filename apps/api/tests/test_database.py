@@ -152,3 +152,88 @@ def test_insert_metadata_allows_null_content_type(tmp_path):
     assert len(rows) == 1
     assert rows[0]["id"] == row_id
     assert rows[0]["content_type"] is None
+
+
+def test_init_db_preserves_existing_data(tmp_path):
+    """Re-running init_db on an existing populated database must not wipe rows."""
+    db_path = tmp_path / "library.db"
+    database.init_db(db_path=db_path)
+    database.insert_metadata(
+        filename="keep.mp3", path="a", size=1, db_path=db_path
+    )
+
+    # Reinitialize — simulates an app restart.
+    database.init_db(db_path=db_path)
+
+    rows = database.list_metadata(db_path=db_path)
+    assert len(rows) == 1
+    assert rows[0]["filename"] == "keep.mp3"
+
+
+def test_list_metadata_returns_plain_dicts(tmp_path):
+    """Rows returned by list_metadata should be plain dicts, not sqlite3.Row."""
+    db_path = tmp_path / "library.db"
+    database.init_db(db_path=db_path)
+    database.insert_metadata(filename="a.mp3", path="a", size=1, db_path=db_path)
+
+    rows = database.list_metadata(db_path=db_path)
+
+    assert len(rows) == 1
+    assert isinstance(rows[0], dict)
+    assert not isinstance(rows[0], sqlite3.Row)
+
+
+def test_insert_metadata_multiple_increasing_ids(tmp_path):
+    """Sequential inserts produce strictly increasing row ids."""
+    db_path = tmp_path / "library.db"
+    database.init_db(db_path=db_path)
+
+    ids = [
+        database.insert_metadata(filename=f"f{i}.mp3", path=f"p{i}", size=i, db_path=db_path)
+        for i in range(3)
+    ]
+
+    assert ids == sorted(ids)
+    assert len(set(ids)) == 3
+
+
+def test_insert_metadata_accepts_zero_size(tmp_path):
+    """A zero-byte file should still be recordable (size is NOT NULL but 0 is valid)."""
+    db_path = tmp_path / "library.db"
+    database.init_db(db_path=db_path)
+
+    row_id = database.insert_metadata(
+        filename="empty.mp3", path="e", size=0, db_path=db_path
+    )
+
+    rows = database.list_metadata(db_path=db_path)
+    assert rows[0]["id"] == row_id
+    assert rows[0]["size"] == 0
+
+
+def test_insert_metadata_handles_unicode_filename(tmp_path):
+    """Non-ASCII filenames and paths are stored and retrieved faithfully."""
+    db_path = tmp_path / "library.db"
+    database.init_db(db_path=db_path)
+
+    database.insert_metadata(
+        filename="日本語タイトル.mp3", path="/library/audio/日本語タイトル.mp3",
+        size=512, content_type="audio/mpeg", db_path=db_path,
+    )
+
+    rows = database.list_metadata(db_path=db_path)
+    assert len(rows) == 1
+    assert rows[0]["filename"] == "日本語タイトル.mp3"
+    assert rows[0]["path"] == "/library/audio/日本語タイトル.mp3"
+
+
+def test_get_connection_creates_parent_directory(tmp_path):
+    """get_connection alone (without init_db) must create missing parent dirs."""
+    db_path = tmp_path / "nested" / "deep" / "library.db"
+    assert not db_path.parent.exists()
+
+    connection = database.get_connection(db_path)
+    try:
+        assert db_path.parent.is_dir()
+    finally:
+        connection.close()
