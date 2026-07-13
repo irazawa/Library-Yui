@@ -185,3 +185,9 @@
 - Task: expanded `apps/api/tests/test_database.py` with 6 new edge-case tests covering re-init data preservation (app restart simulation), plain-dict return type guarantee, strictly-increasing row ids, zero-size files, unicode filenames/paths, and `get_connection` parent-dir creation without `init_db`.
 - Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest -q` — 59 passed (6 new). `tests/test_health.py` — 1 passed.
 - Next small step: add `POST /library/upload` API endpoint accepting multipart file uploads and saving to `library/uploads/`.
+
+## 2026-07-13 SEAST — Slow Builder (POST /library/upload endpoint)
+
+- Task: added `POST /library/upload` API endpoint (`apps/api/app/routes/library.py`) accepting a multipart file upload (`UploadFile`), streaming it to `library/uploads/` in 64 KiB chunks, and recording a metadata row in the SQLite database (filename, path, size, content_type, uploaded_at). Enforces a 50 MiB size cap (HTTP 413) with partial-file cleanup on any error. Added `python-multipart==0.0.20` to `requirements.txt` (FastAPI dependency for multipart parsing). Added `tests/test_upload.py` (6 integration tests: successful upload + 201 + filesystem write + db row, metadata persistence, missing file field 422, filename with dots, empty file allowed, multiple uploads unique ids).
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest -q` — 65 passed (full suite, 6 new). `tests/test_health.py` — 1 passed.
+- Next small step: record upload metadata (filename, path, size, content type, uploaded_at) in the SQLite database upon upload (already partially done — next task can refine/extend).

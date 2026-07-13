@@ -1,11 +1,25 @@
+import logging
 from pathlib import Path
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, UploadFile, status
 from pydantic import BaseModel
 
-from app.storage import AUDIO_DIR, STORAGE_DIRS
+from app import database
+from app.database import DEFAULT_DB_PATH
+from app.storage import AUDIO_DIR, STORAGE_DIRS, UPLOADS_DIR, ensure_storage_dirs
 
 router = APIRouter(tags=["library"])
+
+logger = logging.getLogger(__name__)
+
+# Maximum accepted upload size (50 MiB). Sized to comfortably accept a typical
+# audio file while protecting the server from unbounded payloads.
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+
+# Database path used by the upload endpoint. Tests override this via
+# ``monkeypatch.setattr(library_route, "DB_PATH", tmp_path / "test.db")`` to
+# avoid touching the real database file.
+DB_PATH: Path | str = DEFAULT_DB_PATH
 
 
 class LibrarySummaryResponse(BaseModel):
@@ -23,6 +37,15 @@ class AudioListResponse(BaseModel):
     items: list[AudioItem]
 
 
+class UploadResponse(BaseModel):
+    id: int
+    filename: str
+    path: str
+    size: int
+    content_type: str | None
+    uploaded_at: str
+
+
 def _count_files(directory: Path) -> int:
     """Count regular files directly inside a storage directory.
 
@@ -33,6 +56,13 @@ def _count_files(directory: Path) -> int:
     if not directory.is_dir():
         return 0
     return sum(1 for entry in directory.iterdir() if entry.is_file())
+
+
+def _payload_too_large() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+        detail=f"Upload exceeds the maximum allowed size of {MAX_UPLOAD_BYTES} bytes",
+    )
 
 
 @router.get("/library/summary", response_model=LibrarySummaryResponse)
@@ -58,3 +88,72 @@ def list_audio() -> AudioListResponse:
         if entry.is_file() and entry.suffix.lower() == ".mp3"
     ]
     return AudioListResponse(items=items)
+
+
+@router.post(
+    "/library/upload",
+    response_model=UploadResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def upload_file(file: UploadFile) -> UploadResponse:
+    """Accept a multipart file upload and save it to ``library/uploads/``.
+
+    The file is streamed to disk in chunks to avoid loading the whole payload
+    into memory. After writing, a metadata row is inserted into the SQLite
+    database recording the filename, path, size, content type, and timestamp.
+    """
+
+    filename = file.filename or "upload.bin"
+    content_type = file.content_type
+
+    # Make sure the target directory and database exist before writing.
+    ensure_storage_dirs()
+    database.init_db(DB_PATH)
+
+    destination = UPLOADS_DIR / filename
+
+    written = 0
+    try:
+        with destination.open("wb") as out:
+            while True:
+                chunk = file.file.read(64 * 1024)
+                if not chunk:
+                    break
+                written += len(chunk)
+                if written > MAX_UPLOAD_BYTES:
+                    out.close()
+                    destination.unlink(missing_ok=True)
+                    raise _payload_too_large()
+                out.write(chunk)
+    except Exception:
+        # Clean up the partial file on any error so we never leave a
+        # truncated upload behind.
+        destination.unlink(missing_ok=True)
+        raise
+    finally:
+        file.file.close()
+
+    row_id = database.insert_metadata(
+        filename=filename,
+        path=str(destination),
+        size=written,
+        content_type=content_type,
+        db_path=DB_PATH,
+    )
+
+    logger.info("Uploaded %s (%d bytes) as metadata row %d", filename, written, row_id)
+
+    # Build the response from the freshly written row so the returned shape
+    # matches exactly what is persisted.
+    rows = database.list_metadata(DB_PATH)
+    row = next((r for r in rows if r["id"] == row_id), None)
+    if row is None:  # pragma: no cover - should be unreachable
+        return UploadResponse(
+            id=row_id,
+            filename=filename,
+            path=str(destination),
+            size=written,
+            content_type=content_type,
+            uploaded_at="",
+        )
+    return UploadResponse(**row)
