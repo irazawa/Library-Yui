@@ -221,3 +221,9 @@
 - Task: wired the main web app Uploads card to `GET /library/uploads` (`apps/web/src/main.tsx` + `styles.css`). Added a `useLibraryUploads(refreshKey)` hook that fetches all uploaded items once on mount and re-fetches whenever `refreshKey` changes; the hook is re-triggered automatically after each successful upload so newly uploaded files appear immediately. The new Uploads card (in the `.cards` grid) renders filename, human-readable size, content type, and a localized `uploaded_at` timestamp, with loading and empty fallback states. Added matching `.upload-item` / `.upload-name` / `.upload-meta` styles.
 - Verification: `cd apps/web && npm run build` — built successfully (tsc + vite), 15 modules transformed.
 - Next small step: update `docs/API.md` with descriptions and examples for `POST /library/upload` and `GET /library/uploads`.
+
+## 2026-07-14 SEAST — Slow Builder (API docs: upload endpoints)
+
+- Task: updated `docs/API.md` with full documentation for `POST /library/upload` (multipart `file` field, streaming write, 201 response with metadata fields, 413 size-cap with `MAX_UPLOAD_BYTES` detail, 422 missing-field, curl example) and `GET /library/uploads` (200 newest-first list, full per-item field table, empty list before any db, curl example). Both sections verified against the actual `apps/api/app/routes/library.py` implementation and `tests/test_upload.py` contracts.
+- Verification: docs-only task — `git diff --check` clean (exit 0).
+- Next small step: all current slow-tasks queue items are checked — generate the next tiny task batch (MVP 3 Collections or MVP 1/2 polish).
