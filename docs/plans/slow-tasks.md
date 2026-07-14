@@ -54,6 +54,6 @@ This queue is for scheduled slow-progress runs. Each run should implement at mos
 - [x] Record upload metadata (filename, path, size, content type, uploaded_at) in the SQLite database upon upload.
 - [x] Add integration tests for `POST /library/upload` verifying filesystem write and database insert.
 - [x] Add `GET /library/uploads` API endpoint returning a list of all uploaded items from the SQLite database.
-- [ ] Add a file upload UI component (drag-and-drop or file selector) in the main web app to upload files.
+- [x] Add a file upload UI component (drag-and-drop or file selector) in the main web app to upload files.
 - [ ] Wire the main web app Uploads list to display uploaded files fetched from `GET /library/uploads`.
 - [ ] Update `docs/API.md` with descriptions and examples for `POST /library/upload` and `GET /library/uploads`.

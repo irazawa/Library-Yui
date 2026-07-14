@@ -6,6 +6,7 @@ const API_BASE_URL = 'http://127.0.0.1:8787';
 const LIBRARY_SUMMARY_URL = `${API_BASE_URL}/library/summary`;
 const LIBRARY_AUDIO_URL = `${API_BASE_URL}/library/audio`;
 const JOBS_URL = `${API_BASE_URL}/jobs`;
+const UPLOAD_URL = `${API_BASE_URL}/library/upload`;
 const JOB_POLL_INTERVAL_MS = 2000;
 const TERMINAL_STATUSES = new Set(['completed', 'failed']);
 
@@ -156,6 +157,32 @@ function App() {
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobError, setJobError] = useState<string | null>(null);
   const { jobStatus, jobPollError } = useJobStatus(jobId);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadNote, setUploadNote] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || uploading) return;
+    setUploading(true);
+    setUploadNote(null);
+    setUploadError(null);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await fetch(UPLOAD_URL, { method: 'POST', body: form });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const saved = (await res.json()) as { filename: string };
+      setUploadNote(`Uploaded: ${saved.filename}`);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploading(false);
+      // Allow re-selecting the same file to trigger onChange again.
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -230,8 +257,33 @@ function App() {
           </p>
         )}
         <div className="actions">
-          <button type="button" className="secondary">Upload coming soon</button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="upload-input"
+            onChange={handleFileSelected}
+            aria-label="Upload a file to the library"
+            style={{ display: 'none' }}
+          />
+          <button
+            type="button"
+            className="secondary"
+            disabled={uploading}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {uploading ? 'Uploading…' : 'Upload a file'}
+          </button>
         </div>
+        {uploadNote && (
+          <p className="job-note" role="status">
+            {uploadNote}
+          </p>
+        )}
+        {uploadError && (
+          <p className="job-note job-note-error" role="alert">
+            Upload failed: {uploadError}. Is the API running on port 8787?
+          </p>
+        )}
       </section>
       <section className="library" aria-label="Library summary">
         <header className="library-head">

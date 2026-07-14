@@ -209,3 +209,9 @@
 - Task: added `GET /library/uploads` API endpoint (`apps/api/app/routes/library.py`) returning all uploaded items recorded in the SQLite database, newest-first, via a new `UploadListResponse` model. Returns `{"items": []}` when the database file does not exist yet (works before any uploads). Wraps `list_metadata` in a `sqlite3.Error` guard so a corrupt/unreadable db returns an empty list rather than 500-ing. Added 3 integration tests in `tests/test_upload.py` (empty when no db; two uploads returned newest-first with full metadata contract; a subsequent GET reflects a newly uploaded file).
 - Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_upload.py -q` — 14 passed. Full suite `pytest -q` — 72 passed (3 new).
 - Next small step: add a file upload UI component (drag-and-drop or file selector) in the main web app to upload files.
+
+## 2026-07-14 13:14 SEAST — Slow Builder (upload UI in main web app)
+
+- Task: added a file-selector upload UI to the main web app (`apps/web/src/main.tsx`). The old placeholder "Upload coming soon" button is now a working "Upload a file" button backed by a hidden `<input type="file">`; selecting a file POSTs it as multipart form data to `POST /library/upload` and shows an "Uploaded: <filename>" status note (or an error note if the API is unreachable/rejects the upload). Button disables while uploading; input value is reset after each attempt so the same file can be re-selected.
+- Verification: `cd apps/web && npm run build` — built successfully (tsc + vite), 15 modules transformed.
+- Next small step: wire the main web app Uploads list to display uploaded files fetched from `GET /library/uploads`.
