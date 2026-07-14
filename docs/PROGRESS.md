@@ -215,3 +215,9 @@
 - Task: added a file-selector upload UI to the main web app (`apps/web/src/main.tsx`). The old placeholder "Upload coming soon" button is now a working "Upload a file" button backed by a hidden `<input type="file">`; selecting a file POSTs it as multipart form data to `POST /library/upload` and shows an "Uploaded: <filename>" status note (or an error note if the API is unreachable/rejects the upload). Button disables while uploading; input value is reset after each attempt so the same file can be re-selected.
 - Verification: `cd apps/web && npm run build` — built successfully (tsc + vite), 15 modules transformed.
 - Next small step: wire the main web app Uploads list to display uploaded files fetched from `GET /library/uploads`.
+
+## 2026-07-14 SEAST — Slow Builder (web uploads list wired)
+
+- Task: wired the main web app Uploads card to `GET /library/uploads` (`apps/web/src/main.tsx` + `styles.css`). Added a `useLibraryUploads(refreshKey)` hook that fetches all uploaded items once on mount and re-fetches whenever `refreshKey` changes; the hook is re-triggered automatically after each successful upload so newly uploaded files appear immediately. The new Uploads card (in the `.cards` grid) renders filename, human-readable size, content type, and a localized `uploaded_at` timestamp, with loading and empty fallback states. Added matching `.upload-item` / `.upload-name` / `.upload-meta` styles.
+- Verification: `cd apps/web && npm run build` — built successfully (tsc + vite), 15 modules transformed.
+- Next small step: update `docs/API.md` with descriptions and examples for `POST /library/upload` and `GET /library/uploads`.

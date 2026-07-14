@@ -7,6 +7,7 @@ const LIBRARY_SUMMARY_URL = `${API_BASE_URL}/library/summary`;
 const LIBRARY_AUDIO_URL = `${API_BASE_URL}/library/audio`;
 const JOBS_URL = `${API_BASE_URL}/jobs`;
 const UPLOAD_URL = `${API_BASE_URL}/library/upload`;
+const UPLOADS_URL = `${API_BASE_URL}/library/uploads`;
 const JOB_POLL_INTERVAL_MS = 2000;
 const TERMINAL_STATUSES = new Set(['completed', 'failed']);
 
@@ -30,6 +31,19 @@ interface JobResponse {
   id: string;
   url: string;
   status: string;
+}
+
+interface UploadItem {
+  id: number;
+  filename: string;
+  path: string;
+  size: number;
+  content_type: string | null;
+  uploaded_at: string;
+}
+
+interface UploadListResponse {
+  items: UploadItem[];
 }
 
 /**
@@ -149,6 +163,41 @@ function useLibraryAudio() {
   return { items, loading };
 }
 
+/**
+ * Fetch the list of uploaded files via `GET /library/uploads`.
+ * Pass a changing `refreshKey` (e.g. a counter bumped after a successful
+ * upload) to force a re-fetch. Returns the list plus a loading flag.
+ */
+function useLibraryUploads(refreshKey: number) {
+  const [items, setItems] = useState<UploadItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    fetch(UPLOADS_URL)
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = (await res.json()) as UploadListResponse;
+        if (cancelled) return;
+        setItems(data.items);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setItems([]);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshKey]);
+
+  return { items, loading };
+}
+
 function App() {
   const { state, summary } = useLibrarySummary();
   const { items: audioItems, loading: audioLoading } = useLibraryAudio();
@@ -161,6 +210,8 @@ function App() {
   const [uploading, setUploading] = useState(false);
   const [uploadNote, setUploadNote] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadsRefreshKey, setUploadsRefreshKey] = useState(0);
+  const { items: uploadItems, loading: uploadsLoading } = useLibraryUploads(uploadsRefreshKey);
 
   async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -175,6 +226,7 @@ function App() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const saved = (await res.json()) as { filename: string };
       setUploadNote(`Uploaded: ${saved.filename}`);
+      setUploadsRefreshKey((k) => k + 1);
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
@@ -217,6 +269,29 @@ function App() {
       : state === 'loading'
         ? 'Contacting the backend summary API…'
         : 'Backend unreachable — showing placeholders. Start the API on port 8787.';
+
+  const formatBytes = (bytes: number) => {
+    if (!Number.isFinite(bytes) || bytes < 0) return '—';
+    if (bytes < 1024) return `${bytes} B`;
+    const units = ['KB', 'MB', 'GB'];
+    let value = bytes / 1024;
+    let unit = 0;
+    while (value >= 1024 && unit < units.length - 1) {
+      value /= 1024;
+      unit += 1;
+    }
+    return `${value.toFixed(value >= 100 ? 0 : 1)} ${units[unit]}`;
+  };
+
+  const formatUploadedAt = (iso: string) => {
+    try {
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return iso;
+      return d.toLocaleString();
+    } catch {
+      return iso;
+    }
+  };
 
   return (
     <main className="shell">
@@ -323,6 +398,28 @@ function App() {
           )}
         </article>
         <article><h2>Video</h2><p>MP4 library support is planned after audio.</p></article>
+        <article>
+          <h2>Uploads</h2>
+          {uploadsLoading ? (
+            <p>Loading uploads…</p>
+          ) : uploadItems.length === 0 ? (
+            <p>Uploaded files will appear here.</p>
+          ) : (
+            <ul className="audio-list">
+              {uploadItems.map((item) => (
+                <li key={item.id} className="upload-item">
+                  <span className="upload-name">{item.filename}</span>
+                  <span className="upload-meta">
+                    {formatBytes(item.size)}
+                    {item.content_type ? ` · ${item.content_type}` : ''}
+                    {' · '}
+                    {formatUploadedAt(item.uploaded_at)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </article>
         <article><h2>Collections</h2><p>Anime, Hololive, OST, mood lists, and custom tags.</p></article>
       </section>
     </main>
