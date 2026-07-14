@@ -227,3 +227,71 @@ def test_upload_writes_multichunk_file(monkeypatch, tmp_path):
 
     written = (uploads_dir / "multi.mp3").read_bytes()
     assert written == payload
+
+
+def test_list_uploads_empty_when_no_database(monkeypatch, tmp_path):
+    """GET /library/uploads returns {"items": []} when no db file exists yet."""
+
+    _setup_isolated_storage(monkeypatch, tmp_path)
+
+    response = client.get("/library/uploads")
+
+    assert response.status_code == 200
+    assert response.json() == {"items": []}
+
+
+def test_list_uploads_returns_recorded_uploads_newest_first(monkeypatch, tmp_path):
+    """GET /library/uploads returns all uploaded items, newest first."""
+
+    _setup_isolated_storage(monkeypatch, tmp_path)
+
+    # Upload two distinct files.
+    r1 = client.post(
+        "/library/upload",
+        files={"file": ("first.mp3", b"aaaa", "audio/mpeg")},
+    )
+    r2 = client.post(
+        "/library/upload",
+        files={"file": ("second.mp3", b"bbbb", "audio/mpeg")},
+    )
+    assert r1.status_code == 201
+    assert r2.status_code == 201
+
+    response = client.get("/library/uploads")
+
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert len(items) == 2
+
+    # Newest first: second.mp3 then first.mp3.
+    assert items[0]["filename"] == "second.mp3"
+    assert items[1]["filename"] == "first.mp3"
+    # Each item exposes the full metadata contract.
+    for item in items:
+        assert set(item.keys()) == {
+            "id",
+            "filename",
+            "path",
+            "size",
+            "content_type",
+            "uploaded_at",
+        }
+        assert item["content_type"] == "audio/mpeg"
+        assert item["uploaded_at"]
+
+
+def test_list_uploads_reflects_new_upload(monkeypatch, tmp_path):
+    """A subsequent GET /library/uploads reflects a newly uploaded file."""
+
+    _setup_isolated_storage(monkeypatch, tmp_path)
+
+    assert client.get("/library/uploads").json()["items"] == []
+
+    client.post(
+        "/library/upload",
+        files={"file": ("late.mp3", b"cc", "audio/mpeg")},
+    )
+
+    items = client.get("/library/uploads").json()["items"]
+    assert len(items) == 1
+    assert items[0]["filename"] == "late.mp3"

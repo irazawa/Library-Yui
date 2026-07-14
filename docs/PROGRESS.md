@@ -203,3 +203,9 @@
 - Task: expanded `tests/test_upload.py` with 2 new integration tests covering previously-untested paths of `POST /library/upload`: (1) `test_upload_rejects_file_exceeding_size_cap` — a payload over `MAX_UPLOAD_BYTES` (50 MiB + 1 KiB) is rejected with HTTP 413 and leaves no partial file on disk and no metadata row; (2) `test_upload_writes_multichunk_file` — a payload larger than a single 64 KiB chunk is streamed across multiple writes and reconstructed byte-for-byte on disk (>160 KiB distinct-pattern payload). This completes the "verify filesystem write and database insert" task by exercising the size-cap rejection and multichunk streaming paths.
 - Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_upload.py -q` — 11 passed. Full suite `pytest -q` — 69 passed (2 new).
 - Next small step: add `GET /library/uploads` API endpoint returning a list of all uploaded items from the SQLite database.
+
+## 2026-07-14 SEAST — Slow Builder (GET /library/uploads endpoint)
+
+- Task: added `GET /library/uploads` API endpoint (`apps/api/app/routes/library.py`) returning all uploaded items recorded in the SQLite database, newest-first, via a new `UploadListResponse` model. Returns `{"items": []}` when the database file does not exist yet (works before any uploads). Wraps `list_metadata` in a `sqlite3.Error` guard so a corrupt/unreadable db returns an empty list rather than 500-ing. Added 3 integration tests in `tests/test_upload.py` (empty when no db; two uploads returned newest-first with full metadata contract; a subsequent GET reflects a newly uploaded file).
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_upload.py -q` — 14 passed. Full suite `pytest -q` — 72 passed (3 new).
+- Next small step: add a file upload UI component (drag-and-drop or file selector) in the main web app to upload files.

@@ -1,4 +1,5 @@
 import logging
+import sqlite3
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, UploadFile, status
@@ -44,6 +45,10 @@ class UploadResponse(BaseModel):
     size: int
     content_type: str | None
     uploaded_at: str
+
+
+class UploadListResponse(BaseModel):
+    items: list[UploadResponse]
 
 
 def _count_files(directory: Path) -> int:
@@ -165,3 +170,27 @@ def upload_file(file: UploadFile) -> UploadResponse:
             uploaded_at="",
         )
     return UploadResponse(**row)
+
+
+@router.get("/library/uploads", response_model=UploadListResponse)
+def list_uploads() -> UploadListResponse:
+    """Return all uploaded items recorded in the SQLite database.
+
+    Items are returned newest-first (as stored by ``list_metadata``). When the
+    database file does not exist yet, an empty list is returned so the endpoint
+    works before any uploads have happened.
+    """
+
+    db_file = Path(DB_PATH)
+    if not db_file.is_file():
+        return UploadListResponse(items=[])
+
+    try:
+        rows = database.list_metadata(DB_PATH)
+    except sqlite3.Error:
+        # A corrupt/unreadable database should not 500 the whole endpoint;
+        # return an empty list and let the logs surface the issue.
+        logger.exception("Failed to read uploads from %s", DB_PATH)
+        return UploadListResponse(items=[])
+
+    return UploadListResponse(items=[UploadResponse(**row) for row in rows])
