@@ -57,3 +57,18 @@ This queue is for scheduled slow-progress runs. Each run should implement at mos
 - [x] Add a file upload UI component (drag-and-drop or file selector) in the main web app to upload files.
 - [x] Wire the main web app Uploads list to display uploaded files fetched from `GET /library/uploads`.
 - [x] Update `docs/API.md` with descriptions and examples for `POST /library/upload` and `GET /library/uploads`.
+
+## Next batch (generated 2026-07-15 via Gemini 3.5 Flash)
+
+Begins MVP 3 (Collections) plus one MVP 4 (Video) starter. Each task is small,
+self-contained, and verifiable with a single `pytest` run (backend) or
+`npm run build` (frontend).
+
+- [ ] Add a `tags` table (id, name UNIQUE) and a `metadata_tags` join table (metadata_id, tag_id) to the SQLite schema in `apps/api/app/database.py` `init_db()`, created alongside the existing `metadata` table; add schema/migration tests in `tests/test_database.py`.
+- [ ] Add `add_tag_to_metadata(metadata_id, tag, db_path)` and `remove_tag_from_metadata(metadata_id, tag, db_path)` helpers to `apps/api/app/database.py` (auto-creating tag rows, idempotent) plus unit tests in `tests/test_database.py`.
+- [ ] Add a `GET /library/tags` endpoint returning all tag names in `apps/api/app/routes/library.py` (backed by the `tags` table) plus integration tests.
+- [ ] Add `POST /library/metadata/{id}/tags` (body `{tag}`) and `DELETE /library/metadata/{id}/tags/{tag}` endpoints to `apps/api/app/routes/library.py` for tagging/untagging an uploaded item; add integration tests.
+- [ ] Extend `GET /library/uploads` to accept optional `?tag=` and `?q=` query params filtering by tag name and substring of filename respectively; add tests for both filters.
+- [ ] Add a `GET /library/metadata/{id}` endpoint returning a single metadata row plus its tag list; add tests.
+- [ ] Add a simple search/filter input to the main web app Uploads card (`apps/web/src/main.tsx`) that filters the displayed uploads list by filename substring.
+- [ ] Add a `GET /library/video` endpoint returning a JSON list of `.mp4` files in `library/video` (mirroring `GET /library/audio`) plus tests — MVP 4 starter.

@@ -227,3 +227,9 @@
 - Task: updated `docs/API.md` with full documentation for `POST /library/upload` (multipart `file` field, streaming write, 201 response with metadata fields, 413 size-cap with `MAX_UPLOAD_BYTES` detail, 422 missing-field, curl example) and `GET /library/uploads` (200 newest-first list, full per-item field table, empty list before any db, curl example). Both sections verified against the actual `apps/api/app/routes/library.py` implementation and `tests/test_upload.py` contracts.
 - Verification: docs-only task — `git diff --check` clean (exit 0).
 - Next small step: all current slow-tasks queue items are checked — generate the next tiny task batch (MVP 3 Collections or MVP 1/2 polish).
+
+## 2026-07-15 SEAST — Slow Builder (plan refresh)
+
+- Task: all previous slow-tasks were complete; generated the next batch of 8 tiny tasks via Gemini 3.5 Flash (`agy --model "Gemini 3.5 Flash (High)"`), targeting MVP 3 (Collections: tags/search/metadata detail) plus one MVP 4 (Video) starter. Tasks were aligned to the actual Library-Yui schema (`metadata` table in `apps/api/app/database.py`) and existing route conventions before merging into `docs/plans/slow-tasks.md`. No implementation done this run per cron rule (plan update only).
+- Verification: docs-only plan update — `git diff --check` clean.
+- Next small step: add a `tags` table (id, name UNIQUE) and `metadata_tags` join table to the SQLite schema in `init_db()`, plus schema tests.
