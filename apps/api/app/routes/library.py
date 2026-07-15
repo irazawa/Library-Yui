@@ -51,6 +51,10 @@ class UploadListResponse(BaseModel):
     items: list[UploadResponse]
 
 
+class TagListResponse(BaseModel):
+    items: list[str]
+
+
 def _count_files(directory: Path) -> int:
     """Count regular files directly inside a storage directory.
 
@@ -194,3 +198,26 @@ def list_uploads() -> UploadListResponse:
         return UploadListResponse(items=[])
 
     return UploadListResponse(items=[UploadResponse(**row) for row in rows])
+
+
+@router.get("/library/tags", response_model=TagListResponse)
+def list_tags() -> TagListResponse:
+    """Return all tag names recorded in the database, alphabetical order.
+
+    Returns ``{"items": []}`` when the database file does not exist yet, so
+    the endpoint works before any tags have been created.
+    """
+
+    db_file = Path(DB_PATH)
+    if not db_file.is_file():
+        return TagListResponse(items=[])
+
+    try:
+        names = database.list_all_tags(DB_PATH)
+    except sqlite3.Error:
+        # A corrupt/unreadable database should not 500 the whole endpoint;
+        # return an empty list and let the logs surface the issue.
+        logger.exception("Failed to read tags from %s", DB_PATH)
+        return TagListResponse(items=[])
+
+    return TagListResponse(items=names)

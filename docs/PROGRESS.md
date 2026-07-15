@@ -244,3 +244,9 @@
 - Task: added `add_tag_to_metadata` / `remove_tag_from_metadata` / `list_tags_for_metadata` helpers to `apps/api/app/database.py` (auto-create tag rows via INSERT OR IGNORE, idempotent add/remove, whitespace-stripped names, empty-tag ValueError, tag rows preserved on detach) plus 8 unit tests in `tests/test_database.py`.
 - Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_database.py -q` — 31 passed.
 - Next small step: add `GET /library/tags` endpoint returning all tag names, plus integration tests.
+
+## 2026-07-15 SEAST — Slow Builder (GET /library/tags endpoint)
+
+- Task: added `GET /library/tags` endpoint (`apps/api/app/routes/library.py`) returning all tag names from the `tags` table in alphabetical order via a new `TagListResponse` model and a `list_all_tags(db_path)` helper in `apps/api/app/database.py`. Returns `{"items": []}` when the database file does not exist yet (works before any tags have been created); a corrupt/unreadable db is guarded with an empty-list fallback. Added 2 integration tests in `tests/test_library.py` (empty when no db; all tags returned sorted after seeding two metadata rows + two distinct tags).
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_library.py -q` — 6 passed. Full suite `pytest -q` — 88 passed (2 new).
+- Next small step: add `POST /library/metadata/{id}/tags` and `DELETE /library/metadata/{id}/tags/{tag}` endpoints for tagging/untagging an uploaded item.

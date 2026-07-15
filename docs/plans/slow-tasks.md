@@ -66,7 +66,7 @@ self-contained, and verifiable with a single `pytest` run (backend) or
 
 - [x] Add a `tags` table (id, name UNIQUE) and a `metadata_tags` join table (metadata_id, tag_id) to the SQLite schema in `apps/api/app/database.py` `init_db()`, created alongside the existing `metadata` table; add schema/migration tests in `tests/test_database.py`.
 - [x] Add `add_tag_to_metadata(metadata_id, tag, db_path)` and `remove_tag_from_metadata(metadata_id, tag, db_path)` helpers to `apps/api/app/database.py` (auto-creating tag rows, idempotent) plus unit tests in `tests/test_database.py`.
-- [ ] Add a `GET /library/tags` endpoint returning all tag names in `apps/api/app/routes/library.py` (backed by the `tags` table) plus integration tests.
+- [x] Add a `GET /library/tags` endpoint returning all tag names in `apps/api/app/routes/library.py` (backed by the `tags` table) plus integration tests.
 - [ ] Add `POST /library/metadata/{id}/tags` (body `{tag}`) and `DELETE /library/metadata/{id}/tags/{tag}` endpoints to `apps/api/app/routes/library.py` for tagging/untagging an uploaded item; add integration tests.
 - [ ] Extend `GET /library/uploads` to accept optional `?tag=` and `?q=` query params filtering by tag name and substring of filename respectively; add tests for both filters.
 - [ ] Add a `GET /library/metadata/{id}` endpoint returning a single metadata row plus its tag list; add tests.

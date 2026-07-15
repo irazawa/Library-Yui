@@ -211,6 +211,23 @@ def list_tags_for_metadata(
         connection.close()
 
 
+def list_all_tags(db_path: Path | str = DEFAULT_DB_PATH) -> list[str]:
+    """Return all tag names in alphabetical order.
+
+    Returns an empty list when the database (or tags table) does not exist
+    yet, so callers can use it safely before any tags have been created.
+    """
+
+    connection = get_connection(db_path)
+    try:
+        rows = connection.execute(
+            "SELECT name FROM tags ORDER BY name"
+        ).fetchall()
+        return [row["name"] for row in rows]
+    finally:
+        connection.close()
+
+
 def list_metadata(db_path: Path | str = DEFAULT_DB_PATH) -> list[dict]:
     """Return all metadata rows as a list of dicts, newest first."""
 

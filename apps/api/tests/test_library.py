@@ -42,3 +42,50 @@ def test_library_audio_returns_empty_when_directory_missing(monkeypatch, tmp_pat
 
     assert response.status_code == 200
     assert response.json() == {"items": []}
+
+
+def test_library_tags_returns_empty_when_no_db(monkeypatch, tmp_path):
+    """GET /library/tags returns {"items": []} before any database exists."""
+
+    monkeypatch.setattr(library_route, "DB_PATH", tmp_path / "missing.db")
+
+    response = client.get("/library/tags")
+
+    assert response.status_code == 200
+    assert response.json() == {"items": []}
+
+
+def test_library_tags_returns_all_tags_alphabetical(monkeypatch, tmp_path):
+    """GET /library/tags returns every tag name, sorted alphabetically."""
+
+    db_path = tmp_path / "test.db"
+    monkeypatch.setattr(library_route, "DB_PATH", db_path)
+
+    # Seed the database with metadata + tags via the database helpers.
+    from app import database
+
+    database.init_db(db_path)
+    metadata_id = database.insert_metadata(
+        filename="song.mp3",
+        path=str(tmp_path / "song.mp3"),
+        size=123,
+        content_type="audio/mpeg",
+        db_path=db_path,
+    )
+    database.add_tag_to_metadata(metadata_id, "chill", db_path=db_path)
+    database.add_tag_to_metadata(metadata_id, "Ambient", db_path=db_path)
+    # Attach a second metadata row to a tag that already exists (idempotent).
+    other_id = database.insert_metadata(
+        filename="track.mp3",
+        path=str(tmp_path / "track.mp3"),
+        size=456,
+        content_type="audio/mpeg",
+        db_path=db_path,
+    )
+    database.add_tag_to_metadata(other_id, "chill", db_path=db_path)
+
+    response = client.get("/library/tags")
+
+    assert response.status_code == 200
+    # SQLite ORDER BY name is case-sensitive (ASCII uppercase first).
+    assert response.json() == {"items": ["Ambient", "chill"]}
