@@ -41,18 +41,27 @@ def get_connection(db_path: Path | str = DEFAULT_DB_PATH) -> sqlite3.Connection:
 
 
 def init_db(db_path: Path | str = DEFAULT_DB_PATH) -> None:
-    """Create the database file and the ``metadata`` table if missing.
+    """Create the database file and core tables if missing.
 
     Safe to call repeatedly; existing tables are left untouched. The
     ``metadata`` table stores one row per uploaded or downloaded media item.
 
-    Columns:
+    ``metadata`` columns:
         - ``id``: auto-increment primary key.
         - ``filename``: original file name (e.g. ``song.mp3``).
         - ``path``: filesystem path of the stored file.
         - ``size``: file size in bytes.
         - ``content_type``: MIME type (e.g. ``audio/mpeg``), nullable.
         - ``uploaded_at``: ISO-8601 UTC timestamp of insertion.
+
+    ``tags`` columns (collections / MVP 3):
+        - ``id``: auto-increment primary key.
+        - ``name``: unique tag name.
+
+    ``metadata_tags`` join table:
+        - ``metadata_id``: references ``metadata.id``.
+        - ``tag_id``: references ``tags.id``.
+        - Primary key on ``(metadata_id, tag_id)`` keeps assignments unique.
     """
 
     connection = get_connection(db_path)
@@ -66,6 +75,23 @@ def init_db(db_path: Path | str = DEFAULT_DB_PATH) -> None:
                 size INTEGER NOT NULL,
                 content_type TEXT,
                 uploaded_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tags (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS metadata_tags (
+                metadata_id INTEGER NOT NULL REFERENCES metadata(id) ON DELETE CASCADE,
+                tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+                PRIMARY KEY (metadata_id, tag_id)
             )
             """
         )

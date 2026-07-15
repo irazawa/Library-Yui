@@ -237,3 +237,139 @@ def test_get_connection_creates_parent_directory(tmp_path):
         assert db_path.parent.is_dir()
     finally:
         connection.close()
+
+
+def _table_names(db_path):
+    connection = sqlite3.connect(str(db_path))
+    try:
+        rows = connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()
+    finally:
+        connection.close()
+    return {row[0] for row in rows}
+
+
+def test_init_db_creates_tags_and_join_tables(tmp_path):
+    db_path = tmp_path / "library.db"
+
+    database.init_db(db_path=db_path)
+
+    tables = _table_names(db_path)
+    assert "tags" in tables
+    assert "metadata_tags" in tables
+
+
+def test_tags_table_has_expected_columns(tmp_path):
+    db_path = tmp_path / "library.db"
+    database.init_db(db_path=db_path)
+
+    connection = sqlite3.connect(str(db_path))
+    try:
+        columns = {row[1] for row in connection.execute("PRAGMA table_info(tags)")}
+    finally:
+        connection.close()
+
+    assert columns == {"id", "name"}
+
+
+def test_metadata_tags_table_has_expected_columns(tmp_path):
+    db_path = tmp_path / "library.db"
+    database.init_db(db_path=db_path)
+
+    connection = sqlite3.connect(str(db_path))
+    try:
+        columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(metadata_tags)")
+        }
+    finally:
+        connection.close()
+
+    assert columns == {"metadata_id", "tag_id"}
+
+
+def test_tags_name_is_unique(tmp_path):
+    db_path = tmp_path / "library.db"
+    database.init_db(db_path=db_path)
+
+    connection = sqlite3.connect(str(db_path))
+    try:
+        connection.execute("INSERT INTO tags (name) VALUES ('music')")
+        connection.commit()
+        try:
+            connection.execute("INSERT INTO tags (name) VALUES ('music')")
+            connection.commit()
+            duplicated = True
+        except sqlite3.IntegrityError:
+            duplicated = False
+    finally:
+        connection.close()
+
+    assert duplicated is False
+
+
+def test_metadata_tags_pair_is_unique(tmp_path):
+    db_path = tmp_path / "library.db"
+    database.init_db(db_path=db_path)
+    metadata_id = database.insert_metadata(
+        filename="song.mp3", path="p", size=1, db_path=db_path
+    )
+
+    connection = sqlite3.connect(str(db_path))
+    try:
+        cursor = connection.execute("INSERT INTO tags (name) VALUES ('music')")
+        tag_id = cursor.lastrowid
+        connection.execute(
+            "INSERT INTO metadata_tags (metadata_id, tag_id) VALUES (?, ?)",
+            (metadata_id, tag_id),
+        )
+        connection.commit()
+        try:
+            connection.execute(
+                "INSERT INTO metadata_tags (metadata_id, tag_id) VALUES (?, ?)",
+                (metadata_id, tag_id),
+            )
+            connection.commit()
+            duplicated = True
+        except sqlite3.IntegrityError:
+            duplicated = False
+    finally:
+        connection.close()
+
+    assert duplicated is False
+
+
+def test_init_db_migrates_existing_metadata_only_database(tmp_path):
+    """init_db on a pre-tags database adds the new tables without data loss."""
+    db_path = tmp_path / "library.db"
+
+    # Simulate an old database that only had the metadata table.
+    connection = sqlite3.connect(str(db_path))
+    try:
+        connection.execute(
+            """
+            CREATE TABLE metadata (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                filename TEXT NOT NULL,
+                path TEXT NOT NULL,
+                size INTEGER NOT NULL,
+                content_type TEXT,
+                uploaded_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            "INSERT INTO metadata (filename, path, size, uploaded_at) "
+            "VALUES ('old.mp3', 'p', 1, '2026-01-01T00:00:00+00:00')"
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    database.init_db(db_path=db_path)
+
+    tables = _table_names(db_path)
+    assert {"metadata", "tags", "metadata_tags"} <= tables
+    rows = database.list_metadata(db_path=db_path)
+    assert len(rows) == 1
+    assert rows[0]["filename"] == "old.mp3"

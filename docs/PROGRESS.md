@@ -233,3 +233,8 @@
 - Task: all previous slow-tasks were complete; generated the next batch of 8 tiny tasks via Gemini 3.5 Flash (`agy --model "Gemini 3.5 Flash (High)"`), targeting MVP 3 (Collections: tags/search/metadata detail) plus one MVP 4 (Video) starter. Tasks were aligned to the actual Library-Yui schema (`metadata` table in `apps/api/app/database.py`) and existing route conventions before merging into `docs/plans/slow-tasks.md`. No implementation done this run per cron rule (plan update only).
 - Verification: docs-only plan update — `git diff --check` clean.
 - Next small step: add a `tags` table (id, name UNIQUE) and `metadata_tags` join table to the SQLite schema in `init_db()`, plus schema tests.
+## 2026-07-15 SEAST — Slow Builder (tags schema)
+
+- Task: added `tags` (id, name UNIQUE) and `metadata_tags` (metadata_id, tag_id, composite PK, FK cascade) tables to `init_db()` in `apps/api/app/database.py`; added 6 schema/migration tests in `tests/test_database.py` including a migration test for pre-tags databases.
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_database.py -q` — 23 passed.
+- Next small step: add `add_tag_to_metadata`/`remove_tag_from_metadata` helpers plus unit tests.
