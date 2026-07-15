@@ -55,6 +55,15 @@ class TagListResponse(BaseModel):
     items: list[str]
 
 
+class TagAssignRequest(BaseModel):
+    tag: str
+
+
+class TagAssignResponse(BaseModel):
+    metadata_id: int
+    tags: list[str]
+
+
 def _count_files(directory: Path) -> int:
     """Count regular files directly inside a storage directory.
 
@@ -221,3 +230,58 @@ def list_tags() -> TagListResponse:
         return TagListResponse(items=[])
 
     return TagListResponse(items=names)
+
+
+@router.post(
+    "/library/metadata/{metadata_id}/tags",
+    response_model=TagAssignResponse,
+)
+def assign_tag(metadata_id: int, body: TagAssignRequest) -> TagAssignResponse:
+    """Attach a tag to a metadata row.
+
+    Returns 404 if the metadata row does not exist. The tag row is created
+    automatically and the assignment is idempotent. The response contains the
+    metadata id and the full sorted list of tags now attached to that row.
+    """
+
+    database.init_db(DB_PATH)
+    if not database.metadata_exists(metadata_id, DB_PATH):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Metadata row not found",
+        )
+
+    try:
+        database.add_tag_to_metadata(metadata_id, body.tag, db_path=DB_PATH)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="tag must be a non-empty string",
+        )
+    tags = database.list_tags_for_metadata(metadata_id, DB_PATH)
+    return TagAssignResponse(metadata_id=metadata_id, tags=tags)
+
+
+@router.delete(
+    "/library/metadata/{metadata_id}/tags/{tag}",
+    response_model=TagAssignResponse,
+)
+def remove_tag(metadata_id: int, tag: str) -> TagAssignResponse:
+    """Detach a tag from a metadata row.
+
+    Returns 404 if the metadata row does not exist. The detach is idempotent:
+    removing a tag that is not attached is a silent no-op. The tag row itself
+    is preserved so it can be reused. The response contains the metadata id
+    and the full sorted list of tags now attached to that row.
+    """
+
+    database.init_db(DB_PATH)
+    if not database.metadata_exists(metadata_id, DB_PATH):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Metadata row not found",
+        )
+
+    database.remove_tag_from_metadata(metadata_id, tag, db_path=DB_PATH)
+    tags = database.list_tags_for_metadata(metadata_id, DB_PATH)
+    return TagAssignResponse(metadata_id=metadata_id, tags=tags)

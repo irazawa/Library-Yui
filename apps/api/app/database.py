@@ -228,6 +228,22 @@ def list_all_tags(db_path: Path | str = DEFAULT_DB_PATH) -> list[str]:
         connection.close()
 
 
+def metadata_exists(
+    metadata_id: int,
+    db_path: Path | str = DEFAULT_DB_PATH,
+) -> bool:
+    """Return True if a metadata row with the given id exists."""
+
+    connection = get_connection(db_path)
+    try:
+        row = connection.execute(
+            "SELECT 1 FROM metadata WHERE id = ?", (metadata_id,)
+        ).fetchone()
+        return row is not None
+    finally:
+        connection.close()
+
+
 def list_metadata(db_path: Path | str = DEFAULT_DB_PATH) -> list[dict]:
     """Return all metadata rows as a list of dicts, newest first."""
 

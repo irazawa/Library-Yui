@@ -89,3 +89,160 @@ def test_library_tags_returns_all_tags_alphabetical(monkeypatch, tmp_path):
     assert response.status_code == 200
     # SQLite ORDER BY name is case-sensitive (ASCII uppercase first).
     assert response.json() == {"items": ["Ambient", "chill"]}
+
+
+def test_assign_tag_attaches_and_returns_sorted_list(monkeypatch, tmp_path):
+    """POST /library/metadata/{id}/tags attaches a tag and returns all tags."""
+
+    db_path = tmp_path / "test.db"
+    monkeypatch.setattr(library_route, "DB_PATH", db_path)
+
+    from app import database
+
+    database.init_db(db_path)
+    metadata_id = database.insert_metadata(
+        filename="song.mp3",
+        path=str(tmp_path / "song.mp3"),
+        size=10,
+        content_type="audio/mpeg",
+        db_path=db_path,
+    )
+
+    response = client.post(
+        f"/library/metadata/{metadata_id}/tags", json={"tag": "chill"}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["metadata_id"] == metadata_id
+    assert body["tags"] == ["chill"]
+
+    # Adding a second tag returns both sorted.
+    response = client.post(
+        f"/library/metadata/{metadata_id}/tags", json={"tag": "Ambient"}
+    )
+    assert response.status_code == 200
+    assert response.json()["tags"] == ["Ambient", "chill"]
+
+
+def test_assign_tag_is_idempotent(monkeypatch, tmp_path):
+    db_path = tmp_path / "test.db"
+    monkeypatch.setattr(library_route, "DB_PATH", db_path)
+
+    from app import database
+
+    database.init_db(db_path)
+    metadata_id = database.insert_metadata(
+        filename="song.mp3",
+        path=str(tmp_path / "song.mp3"),
+        size=10,
+        content_type="audio/mpeg",
+        db_path=db_path,
+    )
+
+    for _ in range(2):
+        response = client.post(
+            f"/library/metadata/{metadata_id}/tags", json={"tag": "chill"}
+        )
+        assert response.status_code == 200
+    assert response.json()["tags"] == ["chill"]
+
+
+def test_assign_tag_unknown_metadata_returns_404(monkeypatch, tmp_path):
+    db_path = tmp_path / "test.db"
+    monkeypatch.setattr(library_route, "DB_PATH", db_path)
+
+    from app import database
+
+    database.init_db(db_path)
+
+    response = client.post("/library/metadata/9999/tags", json={"tag": "chill"})
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Metadata row not found"
+
+
+def test_assign_tag_rejects_empty_tag(monkeypatch, tmp_path):
+    db_path = tmp_path / "test.db"
+    monkeypatch.setattr(library_route, "DB_PATH", db_path)
+
+    from app import database
+
+    database.init_db(db_path)
+    metadata_id = database.insert_metadata(
+        filename="song.mp3",
+        path=str(tmp_path / "song.mp3"),
+        size=10,
+        content_type="audio/mpeg",
+        db_path=db_path,
+    )
+
+    response = client.post(
+        f"/library/metadata/{metadata_id}/tags", json={"tag": "   "}
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "tag must be a non-empty string"
+
+
+def test_remove_tag_detaches_and_returns_remaining(monkeypatch, tmp_path):
+    """DELETE /library/metadata/{id}/tags/{tag} detaches and returns list."""
+
+    db_path = tmp_path / "test.db"
+    monkeypatch.setattr(library_route, "DB_PATH", db_path)
+
+    from app import database
+
+    database.init_db(db_path)
+    metadata_id = database.insert_metadata(
+        filename="song.mp3",
+        path=str(tmp_path / "song.mp3"),
+        size=10,
+        content_type="audio/mpeg",
+        db_path=db_path,
+    )
+    database.add_tag_to_metadata(metadata_id, "chill", db_path=db_path)
+    database.add_tag_to_metadata(metadata_id, "Ambient", db_path=db_path)
+
+    response = client.delete(f"/library/metadata/{metadata_id}/tags/chill")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["metadata_id"] == metadata_id
+    assert body["tags"] == ["Ambient"]
+
+
+def test_remove_tag_is_idempotent_when_not_attached(monkeypatch, tmp_path):
+    db_path = tmp_path / "test.db"
+    monkeypatch.setattr(library_route, "DB_PATH", db_path)
+
+    from app import database
+
+    database.init_db(db_path)
+    metadata_id = database.insert_metadata(
+        filename="song.mp3",
+        path=str(tmp_path / "song.mp3"),
+        size=10,
+        content_type="audio/mpeg",
+        db_path=db_path,
+    )
+
+    # Removing a tag that was never attached is a no-op.
+    response = client.delete(f"/library/metadata/{metadata_id}/tags/never")
+
+    assert response.status_code == 200
+    assert response.json()["tags"] == []
+
+
+def test_remove_tag_unknown_metadata_returns_404(monkeypatch, tmp_path):
+    db_path = tmp_path / "test.db"
+    monkeypatch.setattr(library_route, "DB_PATH", db_path)
+
+    from app import database
+
+    database.init_db(db_path)
+
+    response = client.delete("/library/metadata/9999/tags/chill")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Metadata row not found"
