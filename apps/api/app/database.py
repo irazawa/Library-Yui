@@ -135,6 +135,82 @@ def insert_metadata(
         connection.close()
 
 
+def add_tag_to_metadata(
+    metadata_id: int,
+    tag: str,
+    db_path: Path | str = DEFAULT_DB_PATH,
+) -> None:
+    """Attach *tag* to the metadata row *metadata_id*.
+
+    The tag row is created automatically if it does not exist yet, and the
+    operation is idempotent: tagging the same item with the same tag twice is
+    a no-op rather than an error.
+    """
+
+    name = tag.strip()
+    if not name:
+        raise ValueError("tag must be a non-empty string")
+
+    connection = get_connection(db_path)
+    try:
+        connection.execute(
+            "INSERT OR IGNORE INTO tags (name) VALUES (?)", (name,)
+        )
+        row = connection.execute(
+            "SELECT id FROM tags WHERE name = ?", (name,)
+        ).fetchone()
+        connection.execute(
+            "INSERT OR IGNORE INTO metadata_tags (metadata_id, tag_id) "
+            "VALUES (?, ?)",
+            (metadata_id, row["id"]),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+
+def remove_tag_from_metadata(
+    metadata_id: int,
+    tag: str,
+    db_path: Path | str = DEFAULT_DB_PATH,
+) -> None:
+    """Detach *tag* from the metadata row *metadata_id*.
+
+    Idempotent: removing a tag that is not attached (or does not exist at
+    all) is a silent no-op. The tag row itself is kept so it can be reused.
+    """
+
+    connection = get_connection(db_path)
+    try:
+        connection.execute(
+            "DELETE FROM metadata_tags WHERE metadata_id = ? AND tag_id = ("
+            "SELECT id FROM tags WHERE name = ?)",
+            (metadata_id, tag.strip()),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+
+def list_tags_for_metadata(
+    metadata_id: int,
+    db_path: Path | str = DEFAULT_DB_PATH,
+) -> list[str]:
+    """Return the sorted tag names attached to *metadata_id*."""
+
+    connection = get_connection(db_path)
+    try:
+        rows = connection.execute(
+            "SELECT t.name FROM tags t "
+            "JOIN metadata_tags mt ON mt.tag_id = t.id "
+            "WHERE mt.metadata_id = ? ORDER BY t.name",
+            (metadata_id,),
+        ).fetchall()
+        return [row["name"] for row in rows]
+    finally:
+        connection.close()
+
+
 def list_metadata(db_path: Path | str = DEFAULT_DB_PATH) -> list[dict]:
     """Return all metadata rows as a list of dicts, newest first."""
 

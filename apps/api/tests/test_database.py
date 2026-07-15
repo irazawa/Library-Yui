@@ -339,6 +339,113 @@ def test_metadata_tags_pair_is_unique(tmp_path):
     assert duplicated is False
 
 
+def _make_item(db_path, filename="song.mp3"):
+    database.init_db(db_path=db_path)
+    return database.insert_metadata(
+        filename=filename, path=f"/library/audio/{filename}", size=1, db_path=db_path
+    )
+
+
+def test_add_tag_to_metadata_creates_tag_row(tmp_path):
+    db_path = tmp_path / "library.db"
+    metadata_id = _make_item(db_path)
+
+    database.add_tag_to_metadata(metadata_id, "music", db_path=db_path)
+
+    assert database.list_tags_for_metadata(metadata_id, db_path=db_path) == ["music"]
+
+
+def test_add_tag_to_metadata_is_idempotent(tmp_path):
+    db_path = tmp_path / "library.db"
+    metadata_id = _make_item(db_path)
+
+    database.add_tag_to_metadata(metadata_id, "music", db_path=db_path)
+    database.add_tag_to_metadata(metadata_id, "music", db_path=db_path)
+
+    assert database.list_tags_for_metadata(metadata_id, db_path=db_path) == ["music"]
+
+
+def test_add_tag_reuses_existing_tag_row(tmp_path):
+    db_path = tmp_path / "library.db"
+    first = _make_item(db_path, "a.mp3")
+    second = database.insert_metadata(
+        filename="b.mp3", path="/library/audio/b.mp3", size=2, db_path=db_path
+    )
+
+    database.add_tag_to_metadata(first, "music", db_path=db_path)
+    database.add_tag_to_metadata(second, "music", db_path=db_path)
+
+    connection = sqlite3.connect(str(db_path))
+    try:
+        count = connection.execute("SELECT COUNT(*) FROM tags").fetchone()[0]
+    finally:
+        connection.close()
+    assert count == 1
+
+
+def test_add_tag_strips_whitespace(tmp_path):
+    db_path = tmp_path / "library.db"
+    metadata_id = _make_item(db_path)
+
+    database.add_tag_to_metadata(metadata_id, "  music  ", db_path=db_path)
+
+    assert database.list_tags_for_metadata(metadata_id, db_path=db_path) == ["music"]
+
+
+def test_add_tag_rejects_empty_string(tmp_path):
+    db_path = tmp_path / "library.db"
+    metadata_id = _make_item(db_path)
+
+    try:
+        database.add_tag_to_metadata(metadata_id, "   ", db_path=db_path)
+        raised = False
+    except ValueError:
+        raised = True
+
+    assert raised is True
+
+
+def test_remove_tag_from_metadata(tmp_path):
+    db_path = tmp_path / "library.db"
+    metadata_id = _make_item(db_path)
+    database.add_tag_to_metadata(metadata_id, "music", db_path=db_path)
+    database.add_tag_to_metadata(metadata_id, "chill", db_path=db_path)
+
+    database.remove_tag_from_metadata(metadata_id, "music", db_path=db_path)
+
+    assert database.list_tags_for_metadata(metadata_id, db_path=db_path) == ["chill"]
+
+
+def test_remove_tag_is_idempotent_and_keeps_tag_row(tmp_path):
+    db_path = tmp_path / "library.db"
+    metadata_id = _make_item(db_path)
+    database.add_tag_to_metadata(metadata_id, "music", db_path=db_path)
+
+    database.remove_tag_from_metadata(metadata_id, "music", db_path=db_path)
+    # Second removal (and removal of a never-existing tag) must not raise.
+    database.remove_tag_from_metadata(metadata_id, "music", db_path=db_path)
+    database.remove_tag_from_metadata(metadata_id, "ghost", db_path=db_path)
+
+    assert database.list_tags_for_metadata(metadata_id, db_path=db_path) == []
+    connection = sqlite3.connect(str(db_path))
+    try:
+        count = connection.execute("SELECT COUNT(*) FROM tags").fetchone()[0]
+    finally:
+        connection.close()
+    assert count == 1  # tag row is preserved for reuse
+
+
+def test_list_tags_for_metadata_sorted(tmp_path):
+    db_path = tmp_path / "library.db"
+    metadata_id = _make_item(db_path)
+    for tag in ("zeta", "alpha", "mid"):
+        database.add_tag_to_metadata(metadata_id, tag, db_path=db_path)
+
+    tags = database.list_tags_for_metadata(metadata_id, db_path=db_path)
+
+    assert tags == ["alpha", "mid", "zeta"]
+
+
 def test_init_db_migrates_existing_metadata_only_database(tmp_path):
     """init_db on a pre-tags database adds the new tables without data loss."""
     db_path = tmp_path / "library.db"

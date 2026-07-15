@@ -238,3 +238,9 @@
 - Task: added `tags` (id, name UNIQUE) and `metadata_tags` (metadata_id, tag_id, composite PK, FK cascade) tables to `init_db()` in `apps/api/app/database.py`; added 6 schema/migration tests in `tests/test_database.py` including a migration test for pre-tags databases.
 - Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_database.py -q` — 23 passed.
 - Next small step: add `add_tag_to_metadata`/`remove_tag_from_metadata` helpers plus unit tests.
+
+## 2026-07-15 14:48 SEAST — Slow Builder (tag helpers)
+
+- Task: added `add_tag_to_metadata` / `remove_tag_from_metadata` / `list_tags_for_metadata` helpers to `apps/api/app/database.py` (auto-create tag rows via INSERT OR IGNORE, idempotent add/remove, whitespace-stripped names, empty-tag ValueError, tag rows preserved on detach) plus 8 unit tests in `tests/test_database.py`.
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_database.py -q` — 31 passed.
+- Next small step: add `GET /library/tags` endpoint returning all tag names, plus integration tests.
