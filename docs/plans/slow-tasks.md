@@ -68,7 +68,7 @@ self-contained, and verifiable with a single `pytest` run (backend) or
 - [x] Add `add_tag_to_metadata(metadata_id, tag, db_path)` and `remove_tag_from_metadata(metadata_id, tag, db_path)` helpers to `apps/api/app/database.py` (auto-creating tag rows, idempotent) plus unit tests in `tests/test_database.py`.
 - [x] Add a `GET /library/tags` endpoint returning all tag names in `apps/api/app/routes/library.py` (backed by the `tags` table) plus integration tests.
 - [x] Add `POST /library/metadata/{id}/tags` (body `{tag}`) and `DELETE /library/metadata/{id}/tags/{tag}` endpoints to `apps/api/app/routes/library.py` for tagging/untagging an uploaded item; add integration tests.
-- [ ] Extend `GET /library/uploads` to accept optional `?tag=` and `?q=` query params filtering by tag name and substring of filename respectively; add tests for both filters.
+- [x] Extend `GET /library/uploads` to accept optional `?tag=` and `?q=` query params filtering by tag name and substring of filename respectively; add tests for both filters.
 - [ ] Add a `GET /library/metadata/{id}` endpoint returning a single metadata row plus its tag list; add tests.
 - [ ] Add a simple search/filter input to the main web app Uploads card (`apps/web/src/main.tsx`) that filters the displayed uploads list by filename substring.
 - [ ] Add a `GET /library/video` endpoint returning a JSON list of `.mp4` files in `library/video` (mirroring `GET /library/audio`) plus tests — MVP 4 starter.

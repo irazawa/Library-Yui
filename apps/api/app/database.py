@@ -256,3 +256,49 @@ def list_metadata(db_path: Path | str = DEFAULT_DB_PATH) -> list[dict]:
         return [dict(row) for row in rows]
     finally:
         connection.close()
+
+
+def list_metadata_filtered(
+    *,
+    tag: str | None = None,
+    q: str | None = None,
+    db_path: Path | str = DEFAULT_DB_PATH,
+) -> list[dict]:
+    """Return metadata rows optionally filtered by tag and/or filename query.
+
+    Both filters are optional and combine with AND when both are provided:
+
+    - ``tag``: only rows whose tag set includes this tag name (joined via
+      ``metadata_tags``). ``None`` or a blank string skips the tag filter.
+    - ``q``: only rows whose ``filename`` contains the substring (case-
+      insensitive). ``None`` or a blank string skips the query filter.
+
+    Rows are returned newest-first, matching :func:`list_metadata`.
+    """
+
+    conditions: list[str] = []
+    params: list[object] = []
+
+    if tag is not None and tag.strip():
+        conditions.append(
+            "id IN (SELECT mt.metadata_id FROM metadata_tags mt "
+            "JOIN tags t ON t.id = mt.tag_id WHERE t.name = ?)"
+        )
+        params.append(tag.strip())
+
+    if q is not None and q.strip():
+        conditions.append("LOWER(filename) LIKE ?")
+        params.append(f"%{q.strip().lower()}%")
+
+    where_clause = (" WHERE " + " AND ".join(conditions)) if conditions else ""
+
+    connection = get_connection(db_path)
+    try:
+        rows = connection.execute(
+            "SELECT id, filename, path, size, content_type, uploaded_at "
+            f"FROM metadata{where_clause} ORDER BY id DESC",
+            params,
+        ).fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        connection.close()

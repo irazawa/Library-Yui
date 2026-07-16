@@ -295,3 +295,109 @@ def test_list_uploads_reflects_new_upload(monkeypatch, tmp_path):
     items = client.get("/library/uploads").json()["items"]
     assert len(items) == 1
     assert items[0]["filename"] == "late.mp3"
+
+
+def test_list_uploads_filter_by_q_matches_filename_substring(monkeypatch, tmp_path):
+    """GET /library/uploads?q= returns only items whose filename contains q
+    (case-insensitive)."""
+
+    _setup_isolated_storage(monkeypatch, tmp_path)
+
+    client.post(
+        "/library/upload",
+        files={"file": ("ChillSong.mp3", b"a", "audio/mpeg")},
+    )
+    client.post(
+        "/library/upload",
+        files={"file": ("Rock Anthem.mp3", b"b", "audio/mpeg")},
+    )
+    client.post(
+        "/library/upload",
+        files={"file": ("notes.txt", b"c", "text/plain")},
+    )
+
+    # Case-insensitive substring match.
+    items = client.get("/library/uploads?q=chill").json()["items"]
+    assert len(items) == 1
+    assert items[0]["filename"] == "ChillSong.mp3"
+
+    # No match returns empty list.
+    assert client.get("/library/uploads?q=nonexistent").json()["items"] == []
+
+    # Blank q is treated as no filter (returns all).
+    assert len(client.get("/library/uploads?q=").json()["items"]) == 3
+
+
+def test_list_uploads_filter_by_tag_returns_only_tagged(monkeypatch, tmp_path):
+    """GET /library/uploads?tag= returns only items that have the tag attached."""
+
+    uploads_dir, db_path = _setup_isolated_storage(monkeypatch, tmp_path)
+
+    from app import database
+
+    # Upload three files and tag two of them.
+    r1 = client.post(
+        "/library/upload",
+        files={"file": ("tagged_a.mp3", b"a", "audio/mpeg")},
+    )
+    r2 = client.post(
+        "/library/upload",
+        files={"file": ("tagged_b.mp3", b"b", "audio/mpeg")},
+    )
+    r3 = client.post(
+        "/library/upload",
+        files={"file": ("untagged.mp3", b"c", "audio/mpeg")},
+    )
+    database.init_db(db_path)
+    database.add_tag_to_metadata(r1.json()["id"], "chill", db_path=db_path)
+    database.add_tag_to_metadata(r2.json()["id"], "chill", db_path=db_path)
+    database.add_tag_to_metadata(r2.json()["id"], "rock", db_path=db_path)
+
+    items = client.get("/library/uploads?tag=chill").json()["items"]
+    assert len(items) == 2
+    assert {i["filename"] for i in items} == {"tagged_a.mp3", "tagged_b.mp3"}
+
+    # Filtering by the other tag returns only the one tagged item.
+    items_rock = client.get("/library/uploads?tag=rock").json()["items"]
+    assert len(items_rock) == 1
+    assert items_rock[0]["filename"] == "tagged_b.mp3"
+
+    # A tag that nothing has returns empty.
+    assert client.get("/library/uploads?tag=jazz").json()["items"] == []
+
+    # Blank tag is treated as no filter (returns all).
+    assert len(client.get("/library/uploads?tag=").json()["items"]) == 3
+
+
+def test_list_uploads_filter_combines_tag_and_q(monkeypatch, tmp_path):
+    """GET /library/uploads?tag=&q= combines both filters with AND."""
+
+    uploads_dir, db_path = _setup_isolated_storage(monkeypatch, tmp_path)
+
+    from app import database
+
+    r1 = client.post(
+        "/library/upload",
+        files={"file": ("ChillSong.mp3", b"a", "audio/mpeg")},
+    )
+    r2 = client.post(
+        "/library/upload",
+        files={"file": ("ChillRock.mp3", b"b", "audio/mpeg")},
+    )
+    client.post(
+        "/library/upload",
+        files={"file": ("ChillNotes.mp3", b"c", "audio/mpeg")},
+    )
+    database.init_db(db_path)
+    database.add_tag_to_metadata(r1.json()["id"], "chill", db_path=db_path)
+    database.add_tag_to_metadata(r2.json()["id"], "chill", db_path=db_path)
+
+    # Only chill-tagged items whose filename contains "song".
+    items = client.get("/library/uploads?tag=chill&q=song").json()["items"]
+    assert len(items) == 1
+    assert items[0]["filename"] == "ChillSong.mp3"
+
+    # chill tag + "rock" substring matches ChillRock only.
+    items2 = client.get("/library/uploads?tag=chill&q=rock").json()["items"]
+    assert len(items2) == 1
+    assert items2[0]["filename"] == "ChillRock.mp3"

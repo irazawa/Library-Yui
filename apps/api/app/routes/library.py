@@ -186,12 +186,19 @@ def upload_file(file: UploadFile) -> UploadResponse:
 
 
 @router.get("/library/uploads", response_model=UploadListResponse)
-def list_uploads() -> UploadListResponse:
-    """Return all uploaded items recorded in the SQLite database.
+def list_uploads(tag: str | None = None, q: str | None = None) -> UploadListResponse:
+    """Return uploaded items recorded in the SQLite database.
 
-    Items are returned newest-first (as stored by ``list_metadata``). When the
-    database file does not exist yet, an empty list is returned so the endpoint
-    works before any uploads have happened.
+    Items are returned newest-first. When the database file does not exist
+    yet, an empty list is returned so the endpoint works before any uploads
+    have happened.
+
+    Optional query params filter the results (combined with AND when both
+    are provided):
+
+    - ``tag``: only items that have this tag name attached.
+    - ``q``: only items whose ``filename`` contains the substring
+      (case-insensitive).
     """
 
     db_file = Path(DB_PATH)
@@ -199,7 +206,7 @@ def list_uploads() -> UploadListResponse:
         return UploadListResponse(items=[])
 
     try:
-        rows = database.list_metadata(DB_PATH)
+        rows = database.list_metadata_filtered(tag=tag, q=q, db_path=DB_PATH)
     except sqlite3.Error:
         # A corrupt/unreadable database should not 500 the whole endpoint;
         # return an empty list and let the logs surface the issue.
