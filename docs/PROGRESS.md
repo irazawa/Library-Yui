@@ -280,3 +280,9 @@
 - Task: added `GET /library/video` endpoint (`apps/api/app/routes/library.py`) returning a JSON list of `.mp4` files in `library/video`, mirroring `GET /library/audio` exactly. Uses new `VideoItem`/`VideoListResponse` models, imports `VIDEO_DIR` from `app.storage`, filters to `.mp4` only, sorted, and returns `{"items": []}` when the directory is missing. Added 2 integration tests in `tests/test_library.py` (mp4 filtering + empty/missing dir). This is the MVP 4 (Video Library) starter task.
 - Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_library.py -q` — 19 passed. Full suite `pytest -q` — 104 passed (2 new).
 - Next small step: all current slow-tasks queue items are checked — generate the next tiny task batch (MVP 4 Video Library expansion).
+
+## 2026-07-17 SEAST — Slow Builder (plan refresh)
+
+- Task: all previous slow-tasks were complete; generated the next batch of 8 tiny tasks via Gemini 3.5 Flash (`agy --model "Gemini 3.5 Flash (High)" --print ...`), targeting MVP 4 (Video Library: MP4 download, streaming, preview, thumbnails). Tasks were adapted to Library-Yui's actual conventions (filesystem-based `/library/video`, `app/downloader.py` MP3 module with flag gate, `/jobs` flow) before merging into `docs/plans/slow-tasks.md`. No implementation done this run per cron rule (plan update only).
+- Verification: docs-only plan update — `git diff --check` clean.
+- Next small step: add `build_mp4_command()` / `download_mp4()` to `apps/api/app/downloader.py` mirroring the MP3 path.
