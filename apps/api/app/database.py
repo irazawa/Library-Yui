@@ -244,6 +244,24 @@ def metadata_exists(
         connection.close()
 
 
+def get_metadata(
+    metadata_id: int,
+    db_path: Path | str = DEFAULT_DB_PATH,
+) -> dict | None:
+    """Return a single metadata row as a dict, or ``None`` if missing."""
+
+    connection = get_connection(db_path)
+    try:
+        row = connection.execute(
+            "SELECT id, filename, path, size, content_type, uploaded_at "
+            "FROM metadata WHERE id = ?",
+            (metadata_id,),
+        ).fetchone()
+        return dict(row) if row is not None else None
+    finally:
+        connection.close()
+
+
 def list_metadata(db_path: Path | str = DEFAULT_DB_PATH) -> list[dict]:
     """Return all metadata rows as a list of dicts, newest first."""
 

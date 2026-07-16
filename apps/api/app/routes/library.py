@@ -64,6 +64,10 @@ class TagAssignResponse(BaseModel):
     tags: list[str]
 
 
+class MetadataDetailResponse(UploadResponse):
+    tags: list[str]
+
+
 def _count_files(directory: Path) -> int:
     """Count regular files directly inside a storage directory.
 
@@ -237,6 +241,34 @@ def list_tags() -> TagListResponse:
         return TagListResponse(items=[])
 
     return TagListResponse(items=names)
+
+
+@router.get(
+    "/library/metadata/{metadata_id}",
+    response_model=MetadataDetailResponse,
+)
+def get_metadata_detail(metadata_id: int) -> MetadataDetailResponse:
+    """Return a single metadata row plus its attached tag list.
+
+    Returns 404 if the database does not exist yet or the row is missing.
+    """
+
+    db_file = Path(DB_PATH)
+    if not db_file.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Metadata row not found",
+        )
+
+    row = database.get_metadata(metadata_id, DB_PATH)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Metadata row not found",
+        )
+
+    tags = database.list_tags_for_metadata(metadata_id, DB_PATH)
+    return MetadataDetailResponse(**row, tags=tags)
 
 
 @router.post(

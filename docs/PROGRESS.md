@@ -262,3 +262,9 @@
 - Task: extended `GET /library/uploads` (`apps/api/app/routes/library.py`) to accept optional `?tag=` and `?q=` query params (combined with AND). Added a `list_metadata_filtered(tag, q, db_path)` helper to `apps/api/app/database.py` (tag filter via subquery on `metadata_tags`/`tags`; `q` is a case-insensitive `LOWER(filename) LIKE` substring match; blank/None params skip each filter). Added 3 integration tests in `tests/test_upload.py` (filter by q substring + no-match + blank-no-filter; filter by tag + multiple tags + blank-no-filter; combined tag AND q).
 - Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_upload.py -q` — 17 passed. Full suite `pytest -q` — 98 passed (3 new).
 - Next small step: add a `GET /library/metadata/{id}` endpoint returning a single metadata row plus its tag list.
+
+## 2026-07-16 13:10 SEAST — Slow Builder (metadata detail endpoint)
+
+- Task: added `GET /library/metadata/{id}` endpoint to `apps/api/app/routes/library.py` returning a single metadata row (id, filename, path, size, content_type, uploaded_at) plus its sorted `tags` list via a new `MetadataDetailResponse` model. Returns 404 when the database file does not exist yet or the row is missing. Added a `get_metadata(metadata_id, db_path)` helper to `apps/api/app/database.py`. Added 4 integration tests in `tests/test_library.py` (row + sorted tags, row without tags → empty list, unknown id 404, missing db 404).
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_library.py tests/test_database.py -q` — 47 passed. Full suite `pytest -q` — 102 passed (4 new).
+- Next small step: add a search/filter input to the main web app Uploads card filtering by filename substring.

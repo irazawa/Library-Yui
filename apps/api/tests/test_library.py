@@ -246,3 +246,83 @@ def test_remove_tag_unknown_metadata_returns_404(monkeypatch, tmp_path):
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Metadata row not found"
+
+
+def test_get_metadata_detail_returns_row_with_tags(monkeypatch, tmp_path):
+    """GET /library/metadata/{id} returns the row fields plus sorted tags."""
+
+    db_path = tmp_path / "test.db"
+    monkeypatch.setattr(library_route, "DB_PATH", db_path)
+
+    from app import database
+
+    database.init_db(db_path)
+    metadata_id = database.insert_metadata(
+        filename="song.mp3",
+        path=str(tmp_path / "song.mp3"),
+        size=123,
+        content_type="audio/mpeg",
+        db_path=db_path,
+    )
+    database.add_tag_to_metadata(metadata_id, "chill", db_path=db_path)
+    database.add_tag_to_metadata(metadata_id, "Ambient", db_path=db_path)
+
+    response = client.get(f"/library/metadata/{metadata_id}")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id"] == metadata_id
+    assert body["filename"] == "song.mp3"
+    assert body["size"] == 123
+    assert body["content_type"] == "audio/mpeg"
+    assert body["uploaded_at"]
+    # SQLite ORDER BY name is case-sensitive (ASCII uppercase first).
+    assert body["tags"] == ["Ambient", "chill"]
+
+
+def test_get_metadata_detail_without_tags_returns_empty_list(
+    monkeypatch, tmp_path
+):
+    db_path = tmp_path / "test.db"
+    monkeypatch.setattr(library_route, "DB_PATH", db_path)
+
+    from app import database
+
+    database.init_db(db_path)
+    metadata_id = database.insert_metadata(
+        filename="plain.bin",
+        path=str(tmp_path / "plain.bin"),
+        size=1,
+        content_type=None,
+        db_path=db_path,
+    )
+
+    response = client.get(f"/library/metadata/{metadata_id}")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id"] == metadata_id
+    assert body["tags"] == []
+
+
+def test_get_metadata_detail_unknown_id_returns_404(monkeypatch, tmp_path):
+    db_path = tmp_path / "test.db"
+    monkeypatch.setattr(library_route, "DB_PATH", db_path)
+
+    from app import database
+
+    database.init_db(db_path)
+
+    response = client.get("/library/metadata/9999")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Metadata row not found"
+
+
+def test_get_metadata_detail_missing_db_returns_404(monkeypatch, tmp_path):
+    monkeypatch.setattr(library_route, "DB_PATH", tmp_path / "missing.db")
+
+    response = client.get("/library/metadata/1")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Metadata row not found"
