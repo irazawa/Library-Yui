@@ -268,3 +268,9 @@
 - Task: added `GET /library/metadata/{id}` endpoint to `apps/api/app/routes/library.py` returning a single metadata row (id, filename, path, size, content_type, uploaded_at) plus its sorted `tags` list via a new `MetadataDetailResponse` model. Returns 404 when the database file does not exist yet or the row is missing. Added a `get_metadata(metadata_id, db_path)` helper to `apps/api/app/database.py`. Added 4 integration tests in `tests/test_library.py` (row + sorted tags, row without tags → empty list, unknown id 404, missing db 404).
 - Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_library.py tests/test_database.py -q` — 47 passed. Full suite `pytest -q` — 102 passed (4 new).
 - Next small step: add a search/filter input to the main web app Uploads card filtering by filename substring.
+
+## 2026-07-16 SEAST — Slow Builder (uploads search/filter input)
+
+- Task: added a search/filter input to the main web app Uploads card (`apps/web/src/main.tsx` + `styles.css`). A `uploadsFilter` state drives a case-insensitive substring filter over `filename`; the list renders only matching items, with a "No uploads match …" empty state when the filter excludes everything. The input is hidden until there is at least one upload, and the filter only affects client-side display (no API change).
+- Verification: `cd apps/web && npm run build` — built successfully (tsc + vite), 15 modules transformed.
+- Next small step: add a `GET /library/video` endpoint returning a JSON list of `.mp4` files in `library/video` (MVP 4 starter).

@@ -212,6 +212,12 @@ function App() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadsRefreshKey, setUploadsRefreshKey] = useState(0);
   const { items: uploadItems, loading: uploadsLoading } = useLibraryUploads(uploadsRefreshKey);
+  const [uploadsFilter, setUploadsFilter] = useState('');
+  const filterNeedle = uploadsFilter.trim().toLowerCase();
+  const visibleUploadItems =
+    filterNeedle === ''
+      ? uploadItems
+      : uploadItems.filter((it) => it.filename.toLowerCase().includes(filterNeedle));
 
   async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -405,19 +411,33 @@ function App() {
           ) : uploadItems.length === 0 ? (
             <p>Uploaded files will appear here.</p>
           ) : (
-            <ul className="audio-list">
-              {uploadItems.map((item) => (
-                <li key={item.id} className="upload-item">
-                  <span className="upload-name">{item.filename}</span>
-                  <span className="upload-meta">
-                    {formatBytes(item.size)}
-                    {item.content_type ? ` · ${item.content_type}` : ''}
-                    {' · '}
-                    {formatUploadedAt(item.uploaded_at)}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <>
+              <input
+                type="search"
+                className="uploads-filter"
+                placeholder="Filter by filename…"
+                value={uploadsFilter}
+                onChange={(e) => setUploadsFilter(e.target.value)}
+                aria-label="Filter uploads by filename"
+              />
+              {visibleUploadItems.length === 0 ? (
+                <p className="uploads-empty">No uploads match "{uploadsFilter}".</p>
+              ) : (
+                <ul className="audio-list">
+                  {visibleUploadItems.map((item) => (
+                    <li key={item.id} className="upload-item">
+                      <span className="upload-name">{item.filename}</span>
+                      <span className="upload-meta">
+                        {formatBytes(item.size)}
+                        {item.content_type ? ` · ${item.content_type}` : ''}
+                        {' · '}
+                        {formatUploadedAt(item.uploaded_at)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
           )}
         </article>
         <article><h2>Collections</h2><p>Anime, Hololive, OST, mood lists, and custom tags.</p></article>
