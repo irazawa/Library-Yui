@@ -44,6 +44,34 @@ def test_library_audio_returns_empty_when_directory_missing(monkeypatch, tmp_pat
     assert response.json() == {"items": []}
 
 
+def test_library_video_returns_list_of_mp4_files(monkeypatch, tmp_path):
+    """GET /library/video should return only .mp4 files by name, sorted."""
+
+    fake_video = tmp_path / "video"
+    fake_video.mkdir()
+    (fake_video / "a.mp4").write_bytes(b"")
+    (fake_video / "B.mp4").write_bytes(b"")
+    (fake_video / "skip.txt").write_bytes(b"")
+    (fake_video / "ignore.MP3").write_bytes(b"")
+
+    monkeypatch.setattr(library_route, "VIDEO_DIR", fake_video)
+
+    response = client.get("/library/video")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body == {"items": [{"name": "a.mp4"}, {"name": "B.mp4"}]}
+
+
+def test_library_video_returns_empty_when_directory_missing(monkeypatch, tmp_path):
+    monkeypatch.setattr(library_route, "VIDEO_DIR", tmp_path / "does-not-exist")
+
+    response = client.get("/library/video")
+
+    assert response.status_code == 200
+    assert response.json() == {"items": []}
+
+
 def test_library_tags_returns_empty_when_no_db(monkeypatch, tmp_path):
     """GET /library/tags returns {"items": []} before any database exists."""
 

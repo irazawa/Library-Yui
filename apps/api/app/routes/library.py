@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from app import database
 from app.database import DEFAULT_DB_PATH
-from app.storage import AUDIO_DIR, STORAGE_DIRS, UPLOADS_DIR, ensure_storage_dirs
+from app.storage import AUDIO_DIR, STORAGE_DIRS, UPLOADS_DIR, VIDEO_DIR, ensure_storage_dirs
 
 router = APIRouter(tags=["library"])
 
@@ -36,6 +36,14 @@ class AudioItem(BaseModel):
 
 class AudioListResponse(BaseModel):
     items: list[AudioItem]
+
+
+class VideoItem(BaseModel):
+    name: str
+
+
+class VideoListResponse(BaseModel):
+    items: list[VideoItem]
 
 
 class UploadResponse(BaseModel):
@@ -110,6 +118,25 @@ def list_audio() -> AudioListResponse:
         if entry.is_file() and entry.suffix.lower() == ".mp3"
     ]
     return AudioListResponse(items=items)
+
+
+@router.get("/library/video", response_model=VideoListResponse)
+def list_video() -> VideoListResponse:
+    """Return the names of MP4 files in the video library folder.
+
+    Missing directories return an empty list so the endpoint works before
+    any downloads have happened.
+    """
+
+    if not VIDEO_DIR.is_dir():
+        return VideoListResponse(items=[])
+
+    items = [
+        VideoItem(name=entry.name)
+        for entry in sorted(VIDEO_DIR.iterdir())
+        if entry.is_file() and entry.suffix.lower() == ".mp4"
+    ]
+    return VideoListResponse(items=items)
 
 
 @router.post(

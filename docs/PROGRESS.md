@@ -274,3 +274,9 @@
 - Task: added a search/filter input to the main web app Uploads card (`apps/web/src/main.tsx` + `styles.css`). A `uploadsFilter` state drives a case-insensitive substring filter over `filename`; the list renders only matching items, with a "No uploads match …" empty state when the filter excludes everything. The input is hidden until there is at least one upload, and the filter only affects client-side display (no API change).
 - Verification: `cd apps/web && npm run build` — built successfully (tsc + vite), 15 modules transformed.
 - Next small step: add a `GET /library/video` endpoint returning a JSON list of `.mp4` files in `library/video` (MVP 4 starter).
+
+## 2026-07-16 23:19 SEAST — Slow Builder (GET /library/video endpoint)
+
+- Task: added `GET /library/video` endpoint (`apps/api/app/routes/library.py`) returning a JSON list of `.mp4` files in `library/video`, mirroring `GET /library/audio` exactly. Uses new `VideoItem`/`VideoListResponse` models, imports `VIDEO_DIR` from `app.storage`, filters to `.mp4` only, sorted, and returns `{"items": []}` when the directory is missing. Added 2 integration tests in `tests/test_library.py` (mp4 filtering + empty/missing dir). This is the MVP 4 (Video Library) starter task.
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_library.py -q` — 19 passed. Full suite `pytest -q` — 104 passed (2 new).
+- Next small step: all current slow-tasks queue items are checked — generate the next tiny task batch (MVP 4 Video Library expansion).
