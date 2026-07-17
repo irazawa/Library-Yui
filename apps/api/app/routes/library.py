@@ -3,6 +3,7 @@ import sqlite3
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from app import database
@@ -137,6 +138,59 @@ def list_video() -> VideoListResponse:
         if entry.is_file() and entry.suffix.lower() == ".mp4"
     ]
     return VideoListResponse(items=items)
+
+
+def _resolve_video_file(name: str) -> Path | None:
+    """Resolve ``name`` to a real .mp4 file inside ``VIDEO_DIR``.
+
+    Returns the resolved :class:`Path` when the name points to an existing
+    ``.mp4`` file directly inside the video library directory, or ``None``
+    when the file is missing, not an .mp4, or escapes the directory (path
+    traversal). ``None`` lets the caller respond with a uniform 404 without
+    leaking whether a file exists.
+    """
+
+    if not name or "/" in name or "\\" in name:
+        return None
+    if Path(name).suffix.lower() != ".mp4":
+        return None
+
+    try:
+        base = VIDEO_DIR.resolve()
+    except OSError:
+        return None
+    try:
+        target = (VIDEO_DIR / name).resolve()
+    except OSError:
+        return None
+
+    # Ensure the resolved target is a direct child of the video directory.
+    if target.parent != base:
+        return None
+    if not target.is_file():
+        return None
+    return target
+
+
+@router.get(
+    "/library/video/{name}",
+    response_class=FileResponse,
+)
+def stream_video(name: str):
+    """Stream a single ``.mp4`` file from ``library/video``.
+
+    Returns a :class:`FileResponse` with ``video/mp4`` media type so clients
+    can play it with HTTP range requests. Returns 404 for missing files,
+    non-.mp4 names, or any path that escapes the video directory.
+    """
+
+    target = _resolve_video_file(name)
+    if target is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Video not found",
+        )
+    return FileResponse(target, media_type="video/mp4")
 
 
 @router.post(

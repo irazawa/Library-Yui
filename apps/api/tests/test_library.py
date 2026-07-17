@@ -72,6 +72,77 @@ def test_library_video_returns_empty_when_directory_missing(monkeypatch, tmp_pat
     assert response.json() == {"items": []}
 
 
+def test_library_video_by_name_streams_existing_mp4(monkeypatch, tmp_path):
+    """GET /library/video/{name} streams an existing .mp4 file body."""
+
+    fake_video = tmp_path / "video"
+    fake_video.mkdir()
+    payload = b"\x00\x00\x00\x20ftypisom" + b"\x00" * 100
+    (fake_video / "clip.mp4").write_bytes(payload)
+
+    monkeypatch.setattr(library_route, "VIDEO_DIR", fake_video)
+
+    response = client.get("/library/video/clip.mp4")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "video/mp4"
+    assert response.content == payload
+
+
+def test_library_video_by_name_returns_404_for_missing_file(
+    monkeypatch, tmp_path
+):
+    """GET /library/video/{name} 404s when the file does not exist."""
+
+    fake_video = tmp_path / "video"
+    fake_video.mkdir()
+
+    monkeypatch.setattr(library_route, "VIDEO_DIR", fake_video)
+
+    response = client.get("/library/video/missing.mp4")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Video not found"
+
+
+def test_library_video_by_name_returns_404_for_non_mp4(monkeypatch, tmp_path):
+    """GET /library/video/{name} 404s when the name is not a .mp4 file."""
+
+    fake_video = tmp_path / "video"
+    fake_video.mkdir()
+    (fake_video / "notes.txt").write_bytes(b"hi")
+
+    monkeypatch.setattr(library_route, "VIDEO_DIR", fake_video)
+
+    response = client.get("/library/video/notes.txt")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Video not found"
+
+
+def test_library_video_by_name_blocks_path_traversal(monkeypatch, tmp_path):
+    """GET /library/video/{name} never serves files outside the video dir.
+
+    Separator-bearing names are rejected with 404 by the router (they don't
+    match the single-segment ``{name}`` path param), and any name that would
+    resolve outside the directory is rejected with 404 by the handler.
+    """
+
+    fake_video = tmp_path / "video"
+    fake_video.mkdir()
+    # Place a file outside the video dir that a naive join would reach.
+    (tmp_path / "secret.mp4").write_bytes(b"sensitive")
+
+    monkeypatch.setattr(library_route, "VIDEO_DIR", fake_video)
+
+    # Every path-escaping or slash-bearing name must be rejected with 404
+    # and must never return the secret file's bytes.
+    for bad in ("../secret.mp4", "..\\secret.mp4", "/etc/passwd", "sub/clip.mp4"):
+        response = client.get(f"/library/video/{bad}")
+        assert response.status_code == 404, bad
+        assert b"sensitive" not in response.content
+
+
 def test_library_tags_returns_empty_when_no_db(monkeypatch, tmp_path):
     """GET /library/tags returns {"items": []} before any database exists."""
 
