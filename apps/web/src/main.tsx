@@ -5,6 +5,7 @@ import './styles.css';
 const API_BASE_URL = 'http://127.0.0.1:8787';
 const LIBRARY_SUMMARY_URL = `${API_BASE_URL}/library/summary`;
 const LIBRARY_AUDIO_URL = `${API_BASE_URL}/library/audio`;
+const LIBRARY_VIDEO_URL = `${API_BASE_URL}/library/video`;
 const JOBS_URL = `${API_BASE_URL}/jobs`;
 const UPLOAD_URL = `${API_BASE_URL}/library/upload`;
 const UPLOADS_URL = `${API_BASE_URL}/library/uploads`;
@@ -25,6 +26,19 @@ interface AudioItem {
 
 interface AudioListResponse {
   items: AudioItem[];
+}
+
+interface VideoItem {
+  name: string;
+}
+
+interface VideoListResponse {
+  items: VideoItem[];
+}
+
+/** Build the per-file streaming URL for a video item name. */
+function videoUrlFor(name: string): string {
+  return `${LIBRARY_VIDEO_URL}/${encodeURIComponent(name)}`;
 }
 
 interface JobResponse {
@@ -164,6 +178,40 @@ function useLibraryAudio() {
 }
 
 /**
+ * Fetch the list of MP4 files in the video library via `GET /library/video`.
+ * Returns the list of video items plus a loading flag.
+ */
+function useLibraryVideo() {
+  const [items, setItems] = useState<VideoItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    fetch(LIBRARY_VIDEO_URL)
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = (await res.json()) as VideoListResponse;
+        if (cancelled) return;
+        setItems(data.items);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setItems([]);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return { items, loading };
+}
+
+/**
  * Fetch the list of uploaded files via `GET /library/uploads`.
  * Pass a changing `refreshKey` (e.g. a counter bumped after a successful
  * upload) to force a re-fetch. Returns the list plus a loading flag.
@@ -201,6 +249,8 @@ function useLibraryUploads(refreshKey: number) {
 function App() {
   const { state, summary } = useLibrarySummary();
   const { items: audioItems, loading: audioLoading } = useLibraryAudio();
+  const { items: videoItems, loading: videoLoading } = useLibraryVideo();
+  const [activeVideo, setActiveVideo] = useState<VideoItem | null>(null);
   const [url, setUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -403,7 +453,30 @@ function App() {
             </ul>
           )}
         </article>
-        <article><h2>Video</h2><p>MP4 library support is planned after audio.</p></article>
+        <article>
+          <h2>Video</h2>
+          {videoLoading ? (
+            <p>Loading video library…</p>
+          ) : videoItems.length === 0 ? (
+            <p>MP4 downloads will appear here.</p>
+          ) : (
+            <ul className="audio-list">
+              {videoItems.map((item) => (
+                <li key={item.name} className="video-item">
+                  <button
+                    type="button"
+                    className="video-play"
+                    onClick={() => setActiveVideo(item)}
+                    aria-label={`Play ${item.name}`}
+                  >
+                    ▶
+                  </button>
+                  <span className="video-name">{item.name}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </article>
         <article>
           <h2>Uploads</h2>
           {uploadsLoading ? (
@@ -442,6 +515,40 @@ function App() {
         </article>
         <article><h2>Collections</h2><p>Anime, Hololive, OST, mood lists, and custom tags.</p></article>
       </section>
+      {activeVideo && (
+        <div
+          className="video-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Video preview: ${activeVideo.name}`}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setActiveVideo(null);
+          }}
+        >
+          <div className="video-modal">
+            <div className="video-modal-head">
+              <span className="video-modal-title">{activeVideo.name}</span>
+              <button
+                type="button"
+                className="video-modal-close"
+                onClick={() => setActiveVideo(null)}
+                aria-label="Close video preview"
+              >
+                ✕
+              </button>
+            </div>
+            <video
+              className="video-modal-player"
+              src={videoUrlFor(activeVideo.name)}
+              controls
+              autoPlay
+              playsInline
+            >
+              Your browser does not support embedded video playback.
+            </video>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
