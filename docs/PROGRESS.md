@@ -286,3 +286,9 @@
 - Task: all previous slow-tasks were complete; generated the next batch of 8 tiny tasks via Gemini 3.5 Flash (`agy --model "Gemini 3.5 Flash (High)" --print ...`), targeting MVP 4 (Video Library: MP4 download, streaming, preview, thumbnails). Tasks were adapted to Library-Yui's actual conventions (filesystem-based `/library/video`, `app/downloader.py` MP3 module with flag gate, `/jobs` flow) before merging into `docs/plans/slow-tasks.md`. No implementation done this run per cron rule (plan update only).
 - Verification: docs-only plan update — `git diff --check` clean.
 - Next small step: add `build_mp4_command()` / `download_mp4()` to `apps/api/app/downloader.py` mirroring the MP3 path.
+
+## 2026-07-17 09:32 SEAST — Slow Builder (MP4 downloader module)
+
+- Task: added `build_mp4_command()` / `download_mp4()` to `apps/api/app/downloader.py`, porting the legacy video conventions from `Downloader.py` (`-f "bv*+ba/b"`, `--merge-output-format mp4`, `--no-playlist`, `-N 8`, `--ignore-errors`) with output into `VIDEO_DIR` and the same `LIBRARY_YUI_DOWNLOADS_ENABLED` flag gate as the MP3 path. Added 4 new tests in `tests/test_downloader.py` (command conventions, default `VIDEO_DIR`, flag-disabled raise, mocked subprocess run).
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_downloader.py -q` — 20 passed.
+- Next small step: add an optional `mode` field (`audio` | `video`) to `POST /jobs` with 422 on unknown modes.

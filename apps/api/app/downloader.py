@@ -16,7 +16,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from app.storage import AUDIO_DIR
+from app.storage import AUDIO_DIR, VIDEO_DIR
 
 # Environment variable name used as the real-download feature flag.
 DOWNLOADS_ENABLED_FLAG = "LIBRARY_YUI_DOWNLOADS_ENABLED"
@@ -49,6 +49,24 @@ def _audio_args(output_dir: Path) -> list[str]:
         "-x",
         "--audio-format", "mp3",
         "--audio-quality", "3",
+        "--no-playlist",
+    ]
+
+
+def _video_args(output_dir: Path) -> list[str]:
+    """Build yt-dlp video download args targeting MP4.
+
+    Mirrors the legacy ``Downloader.py`` conventions for video: best video +
+    best audio (``bv*+ba/b``), merged into an MP4 container, and
+    ``--no-playlist`` for single-item downloads. The output filename uses the
+    video title and is written directly into *output_dir*.
+    """
+
+    output_template = str(output_dir / "%(title)s.%(ext)s")
+    return [
+        "-o", output_template,
+        "-f", "bv*+ba/b",
+        "--merge-output-format", "mp4",
         "--no-playlist",
     ]
 
@@ -90,6 +108,50 @@ def download_mp3(url: str, output_dir: Path = AUDIO_DIR) -> dict:
 
     output_dir.mkdir(parents=True, exist_ok=True)
     command = build_mp3_command(url, output_dir)
+    result = subprocess.run(command)
+    return {
+        "ok": result.returncode == 0,
+        "returncode": result.returncode,
+        "command": command,
+    }
+
+
+def build_mp4_command(url: str, output_dir: Path = VIDEO_DIR) -> list[str]:
+    """Build the full yt-dlp command to download a single URL as MP4.
+
+    Mirrors :func:`build_mp3_command` but with the legacy video conventions:
+    ``-f "bv*+ba/b"`` and ``--merge-output-format mp4``, writing into
+    *output_dir* (defaults to ``VIDEO_DIR``).
+    """
+
+    yt_dlp = shutil.which("yt-dlp") or "yt-dlp.exe"
+    return [
+        yt_dlp,
+        "--ignore-errors",
+        "-N", "8",
+        *_video_args(output_dir),
+        url,
+    ]
+
+
+def download_mp4(url: str, output_dir: Path = VIDEO_DIR) -> dict:
+    """Download a single YouTube URL as MP4 into *output_dir*.
+
+    Same contract as :func:`download_mp3`: returns a result dict with keys
+    ``ok`` (bool), ``returncode`` (int), and ``command`` (the executed argv
+    list). Raises :class:`RuntimeError` when the feature flag is not enabled,
+    so callers never trigger a real download by accident.
+    """
+
+    if not is_downloads_enabled():
+        raise RuntimeError(
+            "Downloads are disabled. Set the "
+            f"{DOWNLOADS_ENABLED_FLAG} environment variable to '1' to "
+            "enable real downloads."
+        )
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    command = build_mp4_command(url, output_dir)
     result = subprocess.run(command)
     return {
         "ok": result.returncode == 0,

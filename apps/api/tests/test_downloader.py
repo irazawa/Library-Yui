@@ -6,8 +6,11 @@ from app import downloader
 from app.downloader import (
     AUDIO_DIR,
     DOWNLOADS_ENABLED_FLAG,
+    VIDEO_DIR,
     build_mp3_command,
+    build_mp4_command,
     download_mp3,
+    download_mp4,
     is_downloads_enabled,
 )
 
@@ -88,4 +91,63 @@ def test_download_invokes_subprocess_when_enabled(monkeypatch, tmp_path):
     assert captured["command"][-1] == "https://youtu.be/abc"
     assert "--no-playlist" in captured["command"]
     # Output dir was created by download_mp3.
+    assert tmp_path.is_dir()
+
+
+def test_build_mp4_command_conventions(tmp_path):
+    cmd = build_mp4_command("https://youtu.be/test", output_dir=tmp_path)
+    # yt-dlp binary is the first element.
+    assert cmd[0] in ("yt-dlp", "yt-dlp.exe") or "yt-dlp" in cmd[0]
+    # Legacy video conventions ported from Downloader.py.
+    assert "--ignore-errors" in cmd
+    assert "-N" in cmd and "8" in cmd
+    assert "--no-playlist" in cmd
+    assert "-f" in cmd and "bv*+ba/b" in cmd
+    assert "--merge-output-format" in cmd and "mp4" in cmd
+    # No audio-extraction flags on the video path.
+    assert "-x" not in cmd
+    assert "--audio-format" not in cmd
+    # The URL is the last positional argument.
+    assert cmd[-1] == "https://youtu.be/test"
+    # Output template points into the provided dir.
+    out_index = cmd.index("-o")
+    assert str(tmp_path) in cmd[out_index + 1]
+    assert "%(title)s.%(ext)s" in cmd[out_index + 1]
+
+
+def test_build_mp4_command_defaults_to_video_dir():
+    cmd = build_mp4_command("https://youtu.be/test")
+    out_index = cmd.index("-o")
+    assert str(VIDEO_DIR) in cmd[out_index + 1]
+
+
+def test_download_mp4_raises_when_disabled(monkeypatch, tmp_path):
+    _drop_self_from_argv()
+    monkeypatch.delenv(DOWNLOADS_ENABLED_FLAG, raising=False)
+    with pytest.raises(RuntimeError, match="disabled"):
+        download_mp4("https://youtu.be/test", output_dir=tmp_path)
+
+
+def test_download_mp4_invokes_subprocess_when_enabled(monkeypatch, tmp_path):
+    _drop_self_from_argv()
+    monkeypatch.setenv(DOWNLOADS_ENABLED_FLAG, "1")
+
+    captured = {}
+
+    class FakeResult:
+        returncode = 0
+
+    def fake_run(command):
+        captured["command"] = command
+        return FakeResult()
+
+    monkeypatch.setattr(downloader.subprocess, "run", fake_run)
+    result = download_mp4("https://youtu.be/abc", output_dir=tmp_path)
+
+    assert result["ok"] is True
+    assert result["returncode"] == 0
+    assert captured["command"][-1] == "https://youtu.be/abc"
+    assert "--merge-output-format" in captured["command"]
+    assert "mp4" in captured["command"]
+    # Output dir was created by download_mp4.
     assert tmp_path.is_dir()
