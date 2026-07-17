@@ -292,3 +292,9 @@
 - Task: added `build_mp4_command()` / `download_mp4()` to `apps/api/app/downloader.py`, porting the legacy video conventions from `Downloader.py` (`-f "bv*+ba/b"`, `--merge-output-format mp4`, `--no-playlist`, `-N 8`, `--ignore-errors`) with output into `VIDEO_DIR` and the same `LIBRARY_YUI_DOWNLOADS_ENABLED` flag gate as the MP3 path. Added 4 new tests in `tests/test_downloader.py` (command conventions, default `VIDEO_DIR`, flag-disabled raise, mocked subprocess run).
 - Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_downloader.py -q` — 20 passed.
 - Next small step: add an optional `mode` field (`audio` | `video`) to `POST /jobs` with 422 on unknown modes.
+
+## 2026-07-17 SEAST — Slow Builder (POST /jobs mode field)
+
+- Task: added an optional `mode` field (`audio` | `video`, default `audio`) to the `POST /jobs` request body (`apps/api/app/routes/jobs.py`) and persisted it on the job. `JobCreateRequest.mode` is a `Literal["audio", "video"]` so Pydantic rejects unknown values with HTTP 422 (validation error body mentions the `mode` field). `JobRecord` (`app/jobs.py`) gained a `mode: str` key and `create_job()` accepts an optional `mode` argument (defaults to `"audio"`). `JobResponse` now exposes `mode` in all job endpoints. Added 4 new tests in `tests/test_jobs.py` (default audio when omitted + persisted; explicit video persisted; explicit audio; unknown mode → 422 with `mode` in error locs) and updated the existing `test_list_jobs_returns_all_created_jobs` to assert the new key set `{id, url, status, mode}`.
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_jobs.py -q` — 25 passed. Full suite `pytest -q` — 112 passed (4 new).
+- Next small step: wire `/jobs/{id}/start` (when flag-enabled) to call `download_mp4` for `mode == "video"` and `download_mp3` otherwise.

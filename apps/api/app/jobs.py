@@ -15,6 +15,7 @@ class JobRecord(TypedDict):
     id: str
     url: str
     status: str
+    mode: str
 
 
 # Module-level store shared across requests within the same process.
@@ -22,11 +23,24 @@ class JobRecord(TypedDict):
 _JOBS: dict[str, JobRecord] = {}
 
 
-def create_job(url: str) -> JobRecord:
-    """Create a new pending download job for the given URL."""
+# Allowed download modes. ``audio`` extracts an MP3; ``video`` downloads an
+# MP4. Defaults to ``audio`` to preserve the legacy downloader behavior.
+ALLOWED_MODES = ("audio", "video")
+DEFAULT_MODE = "audio"
+
+
+def create_job(url: str, mode: str = DEFAULT_MODE) -> JobRecord:
+    """Create a new pending download job for the given URL.
+
+    *mode* selects the download format (``audio`` for MP3, ``video`` for
+    MP4) and defaults to ``audio`` to match the legacy downloader. The
+    caller is expected to have validated *mode* (e.g. via the API request
+    model); an unknown value is still stored verbatim rather than rejected
+    here so the store stays a dumb data layer.
+    """
 
     job_id = uuid.uuid4().hex
-    job: JobRecord = {"id": job_id, "url": url, "status": "pending"}
+    job: JobRecord = {"id": job_id, "url": url, "status": "pending", "mode": mode}
     _JOBS[job_id] = job
     return job
 

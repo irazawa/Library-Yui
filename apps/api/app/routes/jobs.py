@@ -1,4 +1,5 @@
 import logging
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, HttpUrl
@@ -13,12 +14,16 @@ router = APIRouter(tags=["jobs"])
 
 class JobCreateRequest(BaseModel):
     url: HttpUrl
+    # Optional download format. ``audio`` (default) extracts an MP3; ``video``
+    # downloads an MP4. Unknown values are rejected by Pydantic with HTTP 422.
+    mode: Literal["audio", "video"] = "audio"
 
 
 class JobResponse(BaseModel):
     id: str
     url: str
     status: str
+    mode: str
 
 
 class JobListResponse(BaseModel):
@@ -46,7 +51,9 @@ def _is_youtube_url(url: str) -> bool:
 def create_download_job(payload: JobCreateRequest) -> JobResponse:
     """Accept a YouTube URL and initialize a pending download job.
 
-    Non-YouTube URLs are rejected with HTTP 422.
+    Non-YouTube URLs are rejected with HTTP 422. The optional ``mode`` field
+    selects the download format (``audio`` or ``video``); unknown values are
+    rejected by the request model with HTTP 422.
     """
 
     url = str(payload.url)
@@ -56,7 +63,7 @@ def create_download_job(payload: JobCreateRequest) -> JobResponse:
             detail="Only YouTube URLs are accepted",
         )
 
-    job = create_job(url)
+    job = create_job(url, mode=payload.mode)
     return JobResponse(**job)
 
 

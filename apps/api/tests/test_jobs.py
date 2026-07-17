@@ -221,8 +221,9 @@ def test_list_jobs_returns_all_created_jobs() -> None:
     assert items[0]["id"] == first["id"]
     assert items[1]["id"] == second["id"]
     for item in items:
-        assert {"id", "url", "status"} == set(item.keys())
+        assert {"id", "url", "status", "mode"} == set(item.keys())
         assert item["status"] == "pending"
+        assert item["mode"] == "audio"
 
 
 def test_job_lifecycle_pending_to_downloading_to_completed() -> None:
@@ -376,3 +377,75 @@ def test_start_job_marks_failed_when_download_raises(monkeypatch):
 
     assert response.status_code == 200
     assert response.json()["status"] == "failed"
+
+
+# ---------------------------------------------------------------------------
+# POST /jobs `mode` field (audio | video)
+# ---------------------------------------------------------------------------
+
+def test_create_job_defaults_mode_to_audio_when_omitted() -> None:
+    """When ``mode`` is omitted the job is created in ``audio`` mode."""
+
+    client = TestClient(app)
+    created = client.post(
+        "/jobs",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"},
+    ).json()
+
+    assert created["mode"] == "audio"
+
+    # The persisted job should also carry the default mode.
+    fetched = client.get(f"/jobs/{created['id']}").json()
+    assert fetched["mode"] == "audio"
+
+
+def test_create_job_accepts_explicit_video_mode() -> None:
+    """An explicit ``mode: "video"`` is accepted and persisted on the job."""
+
+    client = TestClient(app)
+    created = client.post(
+        "/jobs",
+        json={
+            "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "mode": "video",
+        },
+    ).json()
+
+    assert created["mode"] == "video"
+
+    fetched = client.get(f"/jobs/{created['id']}").json()
+    assert fetched["mode"] == "video"
+
+
+def test_create_job_accepts_explicit_audio_mode() -> None:
+    """An explicit ``mode: "audio"`` is accepted and persisted on the job."""
+
+    client = TestClient(app)
+    created = client.post(
+        "/jobs",
+        json={
+            "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "mode": "audio",
+        },
+    ).json()
+
+    assert created["mode"] == "audio"
+
+
+def test_create_job_rejects_unknown_mode_with_422() -> None:
+    """Unknown ``mode`` values are rejected with HTTP 422 by Pydantic."""
+
+    client = TestClient(app)
+    response = client.post(
+        "/jobs",
+        json={
+            "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "mode": "ogg",
+        },
+    )
+
+    assert response.status_code == 422
+    # The validation error body should mention the ``mode`` field.
+    errs = response.json().get("detail", [])
+    locs = [loc[-1] for loc in (e.get("loc", []) for e in errs)]
+    assert "mode" in locs
