@@ -379,6 +379,80 @@ def test_start_job_marks_failed_when_download_raises(monkeypatch):
     assert response.json()["status"] == "failed"
 
 
+def test_start_job_calls_download_mp4_for_video_mode(monkeypatch):
+    """When ``mode == "video"`` and the flag is on, ``/start`` must dispatch
+    to :func:`download_mp4` (not ``download_mp3``) and complete the job."""
+
+    monkeypatch.setenv(DOWNLOADS_ENABLED_FLAG, "1")
+
+    calls = {"mp3": 0, "mp4": 0}
+
+    def fake_mp3(url, output_dir=None):
+        calls["mp3"] += 1
+        return {"ok": True, "returncode": 0, "command": ["yt-dlp", url]}
+
+    def fake_mp4(url, output_dir=None):
+        calls["mp4"] += 1
+        return {"ok": True, "returncode": 0, "command": ["yt-dlp", url]}
+
+    monkeypatch.setattr(jobs_routes, "download_mp3", fake_mp3)
+    monkeypatch.setattr(jobs_routes, "download_mp4", fake_mp4)
+
+    client = TestClient(app)
+    created = client.post(
+        "/jobs",
+        json={
+            "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "mode": "video",
+        },
+    ).json()
+    job_id = created["id"]
+
+    response = client.post(f"/jobs/{job_id}/start")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "completed"
+    assert calls["mp4"] == 1
+    assert calls["mp3"] == 0
+
+
+def test_start_job_calls_download_mp3_for_audio_mode(monkeypatch):
+    """When ``mode == "audio"`` (default) and the flag is on, ``/start`` must
+    dispatch to :func:`download_mp3` (not ``download_mp4``)."""
+
+    monkeypatch.setenv(DOWNLOADS_ENABLED_FLAG, "1")
+
+    calls = {"mp3": 0, "mp4": 0}
+
+    def fake_mp3(url, output_dir=None):
+        calls["mp3"] += 1
+        return {"ok": True, "returncode": 0, "command": ["yt-dlp", url]}
+
+    def fake_mp4(url, output_dir=None):
+        calls["mp4"] += 1
+        return {"ok": True, "returncode": 0, "command": ["yt-dlp", url]}
+
+    monkeypatch.setattr(jobs_routes, "download_mp3", fake_mp3)
+    monkeypatch.setattr(jobs_routes, "download_mp4", fake_mp4)
+
+    client = TestClient(app)
+    created = client.post(
+        "/jobs",
+        json={
+            "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "mode": "audio",
+        },
+    ).json()
+    job_id = created["id"]
+
+    response = client.post(f"/jobs/{job_id}/start")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "completed"
+    assert calls["mp3"] == 1
+    assert calls["mp4"] == 0
+
+
 # ---------------------------------------------------------------------------
 # POST /jobs `mode` field (audio | video)
 # ---------------------------------------------------------------------------

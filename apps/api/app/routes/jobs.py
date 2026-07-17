@@ -4,7 +4,7 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, HttpUrl
 
-from app.downloader import download_mp3, is_downloads_enabled
+from app.downloader import download_mp3, download_mp4, is_downloads_enabled
 from app.jobs import create_job, get_job, list_jobs, update_job_status
 
 logger = logging.getLogger(__name__)
@@ -111,11 +111,15 @@ def start_download_job(job_id: str) -> JobResponse:
 
 
 def _maybe_run_download(job_id: str) -> JobResponse | None:
-    """Run the real MP3 download for *job_id* when the flag is enabled.
+    """Run the real download for *job_id* when the flag is enabled.
 
     Returns the updated :class:`JobResponse` when a download was attempted
     (regardless of success/failure), or ``None`` when the flag is disabled so
     the caller can fall back to the plain ``downloading`` response.
+
+    The download function is chosen based on the job ``mode``: ``video``
+    invokes :func:`download_mp4` (MP4 into ``library/video``); any other
+    value (including the default ``audio``) invokes :func:`download_mp3`.
     """
 
     if not is_downloads_enabled():
@@ -126,8 +130,11 @@ def _maybe_run_download(job_id: str) -> JobResponse | None:
         return None
 
     url = job["url"]
+    mode = job.get("mode", "audio")
+    download_fn = download_mp4 if mode == "video" else download_mp3
+
     try:
-        result = download_mp3(url)
+        result = download_fn(url)
     except Exception as exc:  # pragma: no cover - defensive guard
         logger.exception("Download failed for job %s", job_id)
         updated = update_job_status(job_id, "failed")
