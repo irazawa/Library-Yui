@@ -88,3 +88,20 @@ Adapted to Library-Yui conventions (filesystem-based `/library/video`,
 - [x] Extend `GET /library/video` to also return file size and duration (parsed via the container headers, best-effort) alongside the name; add tests in `tests/test_library.py`.
 - [x] Add a backend thumbnail extraction helper using ffmpeg (flag-gated, best-effort, skipped if ffmpeg missing) writing `library/thumbnails/<name>.jpg`; add tests in `tests/test_downloader.py` using a monkeypatched ffmpeg call.
 - [x] Update `docs/API.md` documenting `GET /library/video/{name}` (streaming) and the `mode` field on `POST /jobs`; verify with `git diff --check`.
+
+## Next batch (generated 2026-07-19 via Gemini 3.5 Flash)
+
+MVP 4 polish (thumbnails) plus MVP 2/3 consistency and MVP 5 (Persistence)
+starters. Each task is small, self-contained, and verifiable with a single
+`pytest` run (backend) or `npm run build` (frontend). Adapted to
+Library-Yui conventions (filesystem-based library, `app/downloader.py`,
+SQLite `metadata` store, in-memory job store).
+
+- [ ] Add an audio streaming endpoint `GET /library/audio/{name}` mirroring `GET /library/video/{name}` (FileResponse `audio/mpeg`, HTTP range support, 404 + path-traversal protection) plus tests in `tests/test_library.py`.
+- [ ] Extend `GET /library/audio` to also return file `size` and `duration` (best-effort, reusing the existing `_probe_mp4_duration` container parser from `library.py`) alongside the name; add tests in `tests/test_library.py`.
+- [ ] Wire the ffmpeg thumbnail extraction helper (`extract_thumbnail` from `app/downloader.py`) into the `/jobs/{id}/start` flag-gated path so that a successful `mode == "video"` download also produces `library/thumbnails/<stem>.jpg` (best-effort, never fails the job); add tests in `tests/test_jobs.py`.
+- [ ] Add a `GET /library/thumbnails/{name}` endpoint serving a single `.jpg` thumbnail from `library/thumbnails` with 404 + path-traversal protection (mirroring `_resolve_video_file`); add tests in `tests/test_library.py`.
+- [ ] Show generated thumbnails next to video items in the main web app Video card (best-effort `<img src="/api/library/thumbnails/{name}.jpg">` with `onError` fallback to a placeholder); verify with `npm run build` in `apps/web`.
+- [ ] Add a `jobs` table (id TEXT PRIMARY KEY, url, mode, status, created_at, updated_at) to `init_db()` in `apps/api/app/database.py` without migrating the in-memory store yet (schema-only, with migration tests for pre-existing databases); add tests in `tests/test_database.py`.
+- [ ] Refactor FastAPI route decorators across `apps/api/app/routes/*.py` to use structured OpenAPI `tags=[...]` (`Jobs`, `Library`, `Collections`, `System`) and document the grouping in `docs/API.md`; verify with `pytest tests/test_health.py -q` and `git diff --check`.
+- [ ] Add a global error notification banner component to the main web app (`apps/web/src/main.tsx` + `styles.css`) that captures upload/download failures already caught locally and surfaces them as a dismissible top-of-page banner; verify with `npm run build` in `apps/web`.

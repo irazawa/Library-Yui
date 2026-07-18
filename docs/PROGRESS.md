@@ -334,3 +334,9 @@
 - Task: updated `docs/API.md` with two new pieces of documentation. (1) Added a `GET /library/video/{name}` section covering path parameters, the `video/mp4` `FileResponse` with HTTP range support, the uniform 404 for missing/non-mp4/path-traversal names (no existence leak), and curl + `<video>` examples. (2) Extended the `POST /jobs` section: documented the optional `mode` field (`"audio"` default → MP3, `"video"` → MP4, unknown values → 422), added `mode` to the request body table and example, and added `mode` to the 201 response example and field table. All content verified against the actual `apps/api/app/routes/library.py` (`stream_video`, `_resolve_video_file`) and `apps/api/app/routes/jobs.py` (`JobCreateRequest`, `JobResponse`) implementations.
 - Verification: docs-only task — `git diff --check` clean (exit 0; only line-ending notices, no whitespace errors).
 - Next small step: all current slow-tasks queue items are checked — generate the next tiny task batch for MVP 4 polish / MVP 5 starters.
+
+## 2026-07-19 SEAST — Slow Builder (plan refresh)
+
+- Task: all previous slow-tasks were complete; generated the next batch of 8 tiny tasks via Gemini 3.5 Flash (`agy --model "Gemini 3.5 Flash (High)" --print ...`), targeting MVP 4 polish (audio streaming, audio probe, thumbnail wiring + serving + UI) plus MVP 5 (Persistence) starters (`jobs` SQLite table) and OpenAPI tagging. Tasks were adapted to Library-Yui's actual conventions (filesystem-based `/library/audio` and `/library/video`, `app/downloader.py` ffmpeg helper, SQLite `metadata` store, in-memory job store) before merging into `docs/plans/slow-tasks.md`. No implementation done this run per cron rule (plan update only).
+- Verification: docs-only plan update — `git diff --check` clean.
+- Next small step: add an audio streaming endpoint `GET /library/audio/{name}` mirroring the video streaming endpoint.
