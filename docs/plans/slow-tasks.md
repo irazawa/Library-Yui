@@ -85,6 +85,6 @@ Adapted to Library-Yui conventions (filesystem-based `/library/video`,
 - [x] Wire `/jobs/{id}/start` (when flag-enabled) to call `download_mp4` for `mode == "video"` and `download_mp3` otherwise; add tests in `tests/test_jobs.py`.
 - [x] Add a `GET /library/video/{name}` endpoint streaming a single `.mp4` file from `library/video` with HTTP 404 for missing/unknown files and path-traversal protection; add tests in `tests/test_library.py`.
 - [x] Add an HTML5 `<video>` preview modal/inline player in the main web app (`apps/web/src/main.tsx`) wired to `GET /library/video/{name}`; verify with `npm run build` in `apps/web`.
-- [ ] Extend `GET /library/video` to also return file size and duration (parsed via the container headers, best-effort) alongside the name; add tests in `tests/test_library.py`.
+- [x] Extend `GET /library/video` to also return file size and duration (parsed via the container headers, best-effort) alongside the name; add tests in `tests/test_library.py`.
 - [ ] Add a backend thumbnail extraction helper using ffmpeg (flag-gated, best-effort, skipped if ffmpeg missing) writing `library/thumbnails/<name>.jpg`; add tests in `tests/test_downloader.py` using a monkeypatched ffmpeg call.
 - [ ] Update `docs/API.md` documenting `GET /library/video/{name}` (streaming) and the `mode` field on `POST /jobs`; verify with `git diff --check`.

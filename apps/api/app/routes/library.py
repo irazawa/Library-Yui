@@ -1,5 +1,6 @@
 import logging
 import sqlite3
+import struct
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, UploadFile, status
@@ -41,6 +42,8 @@ class AudioListResponse(BaseModel):
 
 class VideoItem(BaseModel):
     name: str
+    size: int
+    duration: float | None
 
 
 class VideoListResponse(BaseModel):
@@ -96,6 +99,117 @@ def _payload_too_large() -> HTTPException:
     )
 
 
+def _probe_mp4_duration(path: Path) -> float | None:
+    """Best-effort parse of an MP4/MOV container's duration in seconds.
+
+    Walks the top-level ISO/IEC 14496-12 boxes looking for the first ``moov``
+    box and then the first ``mvhd`` box inside it to read the movie header
+    (version 0 or 1). Returns the duration in seconds (``timescale``-based)
+    or ``None`` when the container cannot be parsed, is truncated, or the
+    header is missing. Never raises; all read/parse errors become ``None``.
+    """
+
+    try:
+        with path.open("rb") as fh:
+            return _read_mp4_duration(fh)
+    except (OSError, struct.error, ValueError, EOFError):
+        return None
+
+
+def _read_mp4_duration(fh) -> float | None:
+    """Read the movie header duration from an open MP4 file handle."""
+
+    moov = _find_top_level_box(fh, b"moov")
+    if moov is None:
+        return None
+
+    start, end = moov
+    fh.seek(start)
+    consumed = 8  # header of moov itself has already been accounted for
+    while consumed < (end - start):
+        header = fh.read(8)
+        if len(header) < 8:
+            return None
+        size, btype = struct.unpack(">I4s", header)
+        consumed += 8
+        if size == 1:
+            # 64-bit largesize follows the type.
+            ext = fh.read(8)
+            if len(ext) < 8:
+                return None
+            size = struct.unpack(">Q", ext)[0]
+            consumed += 8
+        elif size == 0:
+            # Box extends to end of file (legal but rare for mvhd).
+            size = end - start - (consumed - 8) + 8
+
+        body_len = size - 8
+        if btype == b"mvhd":
+            body = fh.read(body_len)
+            return _decode_mvhd_duration(body)
+        # Skip over the body of any non-mvhd box.
+        fh.seek(body_len, 1)
+        consumed += body_len
+    return None
+
+
+def _decode_mvhd_duration(body: bytes) -> float | None:
+    """Decode a movie header (``mvhd``) box body into seconds."""
+
+    if len(body) < 1:
+        return None
+    version = body[0]
+    if version == 1:
+        # version(1) flags(3) creation(8) modification(8) timescale(4) duration(8)
+        if len(body) < 4 + 8 + 8 + 4 + 8:
+            return None
+        timescale = struct.unpack(">I", body[4 + 8 + 8 : 4 + 8 + 8 + 4])[0]
+        duration = struct.unpack(">Q", body[4 + 8 + 8 + 4 : 4 + 8 + 8 + 4 + 8])[0]
+    else:
+        # version 0: version(1) flags(3) creation(4) modification(4) timescale(4) duration(4)
+        if len(body) < 4 + 4 + 4 + 4 + 4:
+            return None
+        timescale = struct.unpack(">I", body[4 + 4 + 4 : 4 + 4 + 4 + 4])[0]
+        duration = struct.unpack(">I", body[4 + 4 + 4 + 4 : 4 + 4 + 4 + 4 + 4])[0]
+    if timescale <= 0:
+        return None
+    return duration / timescale
+
+
+def _find_top_level_box(fh, target: bytes) -> tuple[int, int] | None:
+    """Return ``(body_start, body_end)`` byte offsets of the first top-level
+    ISO/IEC 14496-12 box whose 4-byte type matches ``target``.
+
+    ``body_start`` excludes the 8-byte box header. Scans the whole file from
+    the current position. Returns ``None`` if not found. Seeks back to the
+    file start before returning.
+    """
+
+    fh.seek(0, 2)
+    file_end = fh.tell()
+    fh.seek(0)
+    pos = 0
+    while pos + 8 <= file_end:
+        fh.seek(pos)
+        header = fh.read(8)
+        if len(header) < 8:
+            return None
+        size, btype = struct.unpack(">I4s", header)
+        if size == 1:
+            ext = fh.read(8)
+            if len(ext) < 8:
+                return None
+            size = struct.unpack(">Q", ext)[0]
+        elif size == 0:
+            size = file_end - pos
+        if size < 8 or pos + size > file_end:
+            return None
+        if btype == target:
+            return (pos + 8, pos + size)
+        pos += size
+    return None
+
+
 @router.get("/library/summary", response_model=LibrarySummaryResponse)
 def get_library_summary() -> LibrarySummaryResponse:
     counts = {name: _count_files(path) for name, path in STORAGE_DIRS.items()}
@@ -125,6 +239,8 @@ def list_audio() -> AudioListResponse:
 def list_video() -> VideoListResponse:
     """Return the names of MP4 files in the video library folder.
 
+    Each item includes its file size in bytes and the container-decoded
+    duration in seconds when the MP4 header can be parsed best-effort.
     Missing directories return an empty list so the endpoint works before
     any downloads have happened.
     """
@@ -132,11 +248,16 @@ def list_video() -> VideoListResponse:
     if not VIDEO_DIR.is_dir():
         return VideoListResponse(items=[])
 
-    items = [
-        VideoItem(name=entry.name)
-        for entry in sorted(VIDEO_DIR.iterdir())
-        if entry.is_file() and entry.suffix.lower() == ".mp4"
-    ]
+    items: list[VideoItem] = []
+    for entry in sorted(VIDEO_DIR.iterdir()):
+        if not (entry.is_file() and entry.suffix.lower() == ".mp4"):
+            continue
+        try:
+            size = entry.stat().st_size
+        except OSError:
+            size = 0
+        duration = _probe_mp4_duration(entry)
+        items.append(VideoItem(name=entry.name, size=size, duration=duration))
     return VideoListResponse(items=items)
 
 

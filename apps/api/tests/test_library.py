@@ -45,12 +45,12 @@ def test_library_audio_returns_empty_when_directory_missing(monkeypatch, tmp_pat
 
 
 def test_library_video_returns_list_of_mp4_files(monkeypatch, tmp_path):
-    """GET /library/video should return only .mp4 files by name, sorted."""
+    """GET /library/video should return only .mp4 files by name, sorted, with size/duration."""
 
     fake_video = tmp_path / "video"
     fake_video.mkdir()
-    (fake_video / "a.mp4").write_bytes(b"")
-    (fake_video / "B.mp4").write_bytes(b"")
+    (fake_video / "a.mp4").write_bytes(b"\x00\x01\x02\x03")
+    (fake_video / "B.mp4").write_bytes(b"\x00")
     (fake_video / "skip.txt").write_bytes(b"")
     (fake_video / "ignore.MP3").write_bytes(b"")
 
@@ -60,7 +60,12 @@ def test_library_video_returns_list_of_mp4_files(monkeypatch, tmp_path):
 
     assert response.status_code == 200
     body = response.json()
-    assert body == {"items": [{"name": "a.mp4"}, {"name": "B.mp4"}]}
+    assert body == {
+        "items": [
+            {"name": "a.mp4", "size": 4, "duration": None},
+            {"name": "B.mp4", "size": 1, "duration": None},
+        ]
+    }
 
 
 def test_library_video_returns_empty_when_directory_missing(monkeypatch, tmp_path):
@@ -70,6 +75,83 @@ def test_library_video_returns_empty_when_directory_missing(monkeypatch, tmp_pat
 
     assert response.status_code == 200
     assert response.json() == {"items": []}
+
+
+def _make_minimal_mp4(duration_seconds: float, timescale: int = 1000) -> bytes:
+    """Build a minimal valid MP4 with a moov/mvhd box for duration parsing tests."""
+
+    # version 0 mvhd body: version(1) flags(3) creation(4) modification(4)
+    # timescale(4) duration(4) ... remaining fields filled with zeros.
+    duration_units = int(duration_seconds * timescale)
+    mvhd_body = (
+        b"\x00"  # version
+        b"\x00\x00\x00"  # flags
+        + (0).to_bytes(4, "big")  # creation_time
+        + (0).to_bytes(4, "big")  # modification_time
+        + timescale.to_bytes(4, "big")  # timescale
+        + duration_units.to_bytes(4, "big")  # duration
+        + b"\x00" * 80  # remaining mvhd fields (rate, volume, matrix, etc.)
+    )
+    mvhd_size = 8 + len(mvhd_body)
+    mvhd_box = mvhd_size.to_bytes(4, "big") + b"mvhd" + mvhd_body
+
+    # ftyp box so the file is recognizably an MP4.
+    ftyp_body = b"isom" + (0x200).to_bytes(4, "big") + b"isom"
+    ftyp_box = (8 + len(ftyp_body)).to_bytes(4, "big") + b"ftyp" + ftyp_body
+
+    moov_body = ftyp_box + mvhd_box
+    # NOTE: in a real file, moov would only contain mvhd. We embed ftyp
+    # to make sure the parser ignores non-mvhd boxes and still finds mvhd.
+    moov_body = mvhd_box
+    moov_box = (8 + len(moov_body)).to_bytes(4, "big") + b"moov" + moov_body
+
+    return ftyp_box + moov_box
+
+
+def test_library_video_returns_duration_from_container_header(
+    monkeypatch, tmp_path
+):
+    """GET /library/video parses the moov/mvhd header to expose duration in seconds."""
+
+    fake_video = tmp_path / "video"
+    fake_video.mkdir()
+    payload = _make_minimal_mp4(duration_seconds=2.5, timescale=1000)
+    (fake_video / "clip.mp4").write_bytes(payload)
+
+    monkeypatch.setattr(library_route, "VIDEO_DIR", fake_video)
+
+    response = client.get("/library/video")
+
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert len(items) == 1
+    item = items[0]
+    assert item["name"] == "clip.mp4"
+    assert item["size"] == len(payload)
+    assert item["duration"] == pytest.approx(2.5, rel=1e-6)
+
+
+def test_library_video_returns_duration_none_for_non_mp4_container(
+    monkeypatch, tmp_path
+):
+    """A .mp4 file whose body is not an MP4 container still returns name+size and None duration."""
+
+    fake_video = tmp_path / "video"
+    fake_video.mkdir()
+    payload = b"\x00\x00\x00\x20ftypisom" + b"\x00" * 100  # not a real moov
+    (fake_video / "garbage.mp4").write_bytes(payload)
+
+    monkeypatch.setattr(library_route, "VIDEO_DIR", fake_video)
+
+    response = client.get("/library/video")
+
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert len(items) == 1
+    item = items[0]
+    assert item["name"] == "garbage.mp4"
+    assert item["size"] == len(payload)
+    assert item["duration"] is None
 
 
 def test_library_video_by_name_streams_existing_mp4(monkeypatch, tmp_path):
