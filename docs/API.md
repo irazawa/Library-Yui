@@ -110,23 +110,70 @@ Only `.mp3` files are included. A missing directory returns an empty list.
 curl http://127.0.0.1:8787/library/audio
 ```
 
+## `GET /library/video/{name}`
+
+Streams a single `.mp4` file from the video library folder. The response uses
+the `video/mp4` media type and supports HTTP range requests, so browsers and
+media players can seek within the file via an HTML5 `<video>` element.
+
+The endpoint only serves files directly inside `library/video/`. Path-traversal
+attempts (e.g. `../`, leading slashes, backslash separators, or nested
+subdirectories) and non-`.mp4` names all resolve to a uniform `404` that does
+not leak whether any file exists.
+
+### Path parameters
+
+| Parameter | Type   | Description                              |
+| --------- | ------ | ---------------------------------------- |
+| `name`    | string | The `.mp4` file name to stream (no path). |
+
+### Response — `200 OK`
+
+Binary MP4 content with `Content-Type: video/mp4`. Supports `Range` requests
+for partial-content playback (HTTP 206).
+
+### Response — `404 Not Found`
+
+Returned when the file is missing, the name is not a `.mp4`, or the resolved
+path escapes `library/video`.
+
+```json
+{
+  "detail": "Video not found"
+}
+```
+
+### Example
+
+```bash
+# Download the full file
+curl -o clip.mp4 http://127.0.0.1:8787/library/video/clip.mp4
+
+# Stream it into an HTML5 player
+# <video src="http://127.0.0.1:8787/library/video/clip.mp4" controls></video>
+```
+
 ## `POST /jobs`
 
 Accepts a YouTube URL and initializes a pending download job. Returns the new
-job's id, url, and status. The job is stored in an in-memory store (jobs are
-lost on server restart until durable persistence is added).
+job's id, url, status, and mode. The job is stored in an in-memory store (jobs
+are lost on server restart until durable persistence is added).
+
+Non-YouTube URLs are rejected with HTTP 422 (`"Only YouTube URLs are accepted"`).
 
 ### Request body
 
 ```json
 {
-  "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+  "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+  "mode": "audio"
 }
 ```
 
-| Field | Type   | Description                                      |
-| ----- | ------ | ------------------------------------------------ |
-| `url` | string | A valid HTTP(S) URL of the media to download.    |
+| Field | Type   | Description                                                                                       |
+| ----- | ------ | ------------------------------------------------------------------------------------------------- |
+| `url` | string | A valid HTTP(S) URL of the media to download (must be a YouTube host).                            |
+| `mode`| string | Optional download format: `"audio"` (default) extracts an MP3; `"video"` downloads an MP4. Unknown values are rejected with HTTP 422. |
 
 ### Response — `201 Created`
 
@@ -134,7 +181,8 @@ lost on server restart until durable persistence is added).
 {
   "id": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
   "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-  "status": "pending"
+  "status": "pending",
+  "mode": "audio"
 }
 ```
 
@@ -143,6 +191,7 @@ lost on server restart until durable persistence is added).
 | `id`     | string | Unique job identifier (UUID hex).                    |
 | `url`    | string | The source URL submitted with the job.               |
 | `status` | string | Current lifecycle status (see statuses below).       |
+| `mode`   | string | Download format recorded on the job (`"audio"` or `"video"`). |
 
 ### Job statuses
 
