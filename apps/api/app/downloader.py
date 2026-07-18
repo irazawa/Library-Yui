@@ -16,10 +16,15 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from app.storage import AUDIO_DIR, VIDEO_DIR
+from app.storage import AUDIO_DIR, THUMBNAILS_DIR, VIDEO_DIR
 
 # Environment variable name used as the real-download feature flag.
 DOWNLOADS_ENABLED_FLAG = "LIBRARY_YUI_DOWNLOADS_ENABLED"
+
+# Default seek offset (seconds) at which the thumbnail frame is sampled.
+DEFAULT_THUMBNAIL_OFFSET = 1.0
+# Default max width for extracted thumbnails; height keeps aspect ratio.
+DEFAULT_THUMBNAIL_WIDTH = 320
 
 
 def is_downloads_enabled() -> bool:
@@ -158,3 +163,128 @@ def download_mp4(url: str, output_dir: Path = VIDEO_DIR) -> dict:
         "returncode": result.returncode,
         "command": command,
     }
+
+
+def _is_thumbnail_flag_enabled() -> bool:
+    """Return whether thumbnail extraction is enabled.
+
+    Thumbnails reuse the same ``LIBRARY_YUI_DOWNLOADS_ENABLED`` flag as
+    downloads so they cannot run by accident during development or tests.
+    """
+
+    return is_downloads_enabled()
+
+
+def _resolve_ffmpeg() -> str | None:
+    """Resolve the ffmpeg executable, returning ``None`` if missing.
+
+    Uses :func:`shutil.which` to find ``ffmpeg`` (or ``ffmpeg.exe`` on
+    Windows as a fallback). Returns ``None`` when ffmpeg is not installed,
+    which makes thumbnail extraction a best-effort, non-fatal operation.
+    """
+
+    return shutil.which("ffmpeg") or shutil.which("ffmpeg.exe")
+
+
+def build_thumbnail_command(
+    video_path: Path,
+    output_path: Path,
+    *,
+    offset: float = DEFAULT_THUMBNAIL_OFFSET,
+    width: int = DEFAULT_THUMBNAIL_WIDTH,
+    ffmpeg: str = "ffmpeg",
+) -> list[str]:
+    """Build the ffmpeg argv to extract a single thumbnail frame.
+
+    Samples one frame at *offset* seconds, scales to *width* keeping aspect
+    ratio (``-1`` for height), and writes a single JPEG to *output_path*.
+    Mirrors ffmpeg conventions: input path, seek, frames, scale filter,
+    ``-update`` so a single file is produced.
+    """
+
+    return [
+        ffmpeg,
+        "-ss", f"{offset}",
+        "-i", str(video_path),
+        "-frames:v", "1",
+        "-vf", f"scale={width}:-1",
+        "-q:v", "3",
+        "-y",
+        "-update", "1",
+        str(output_path),
+    ]
+
+
+def extract_thumbnail(
+    video_path: Path,
+    *,
+    output_dir: Path = THUMBNAILS_DIR,
+    offset: float = DEFAULT_THUMBNAIL_OFFSET,
+    width: int = DEFAULT_THUMBNAIL_WIDTH,
+) -> dict:
+    """Extract a single thumbnail JPEG from *video_path*.
+
+    Writes ``<output_dir>/<video-stem>.jpg``. Best-effort: returns a result
+    dict (``ok``, ``skipped``, ``path``, ``returncode``, ``command``) and
+    never raises. Skips silently when:
+
+    - The feature flag is off (``ok=False, skipped=True``).
+    - ffmpeg is not on PATH (``ok=False, skipped=True``).
+    - The input video file does not exist (``ok=False, skipped=True``).
+
+    On ffmpeg failure the partial output file (if any) is removed so the
+    thumbnails folder is not left with garbage.
+    """
+
+    result: dict = {
+        "ok": False,
+        "skipped": False,
+        "path": None,
+        "returncode": None,
+        "command": None,
+    }
+
+    if not _is_thumbnail_flag_enabled():
+        result["skipped"] = True
+        result["ok"] = False
+        return result
+
+    ffmpeg = _resolve_ffmpeg()
+    if ffmpeg is None:
+        result["skipped"] = True
+        result["ok"] = False
+        return result
+
+    if not Path(video_path).is_file():
+        result["skipped"] = True
+        result["ok"] = False
+        return result
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = Path(output_dir) / (Path(video_path).stem + ".jpg")
+
+    command = build_thumbnail_command(
+        Path(video_path),
+        output_path,
+        offset=offset,
+        width=width,
+        ffmpeg=ffmpeg,
+    )
+    completed = subprocess.run(command)
+    result["returncode"] = completed.returncode
+    result["command"] = command
+    result["ok"] = completed.returncode == 0 and output_path.is_file()
+
+    # Clean up partial output on failure so we never leak garbage.
+    if not result["ok"] and output_path.exists():
+        try:
+            output_path.unlink()
+        except OSError:
+            pass
+
+    if result["ok"]:
+        result["path"] = str(output_path)
+    else:
+        result["skipped"] = True
+
+    return result
