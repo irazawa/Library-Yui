@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from app import database
 from app.database import DEFAULT_DB_PATH
-from app.storage import AUDIO_DIR, STORAGE_DIRS, UPLOADS_DIR, VIDEO_DIR, ensure_storage_dirs
+from app.storage import AUDIO_DIR, STORAGE_DIRS, THUMBNAILS_DIR, UPLOADS_DIR, VIDEO_DIR, ensure_storage_dirs
 
 router = APIRouter(tags=["library"])
 
@@ -375,6 +375,59 @@ def stream_audio(name: str):
             detail="Audio not found",
         )
     return FileResponse(target, media_type="audio/mpeg")
+
+
+def _resolve_thumbnail_file(name: str) -> Path | None:
+    """Resolve ``name`` to a real .jpg file inside ``THUMBNAILS_DIR``.
+
+    Returns the resolved :class:`Path` when the name points to an existing
+    ``.jpg`` file directly inside the thumbnails directory, or ``None`` when
+    the file is missing, not a .jpg, or escapes the directory (path
+    traversal). ``None`` lets the caller respond with a uniform 404 without
+    leaking whether a file exists.
+    """
+
+    if not name or "/" in name or "\\" in name:
+        return None
+    if Path(name).suffix.lower() != ".jpg":
+        return None
+
+    try:
+        base = THUMBNAILS_DIR.resolve()
+    except OSError:
+        return None
+    try:
+        target = (THUMBNAILS_DIR / name).resolve()
+    except OSError:
+        return None
+
+    # Ensure the resolved target is a direct child of the thumbnails directory.
+    if target.parent != base:
+        return None
+    if not target.is_file():
+        return None
+    return target
+
+
+@router.get(
+    "/library/thumbnails/{name}",
+    response_class=FileResponse,
+)
+def serve_thumbnail(name: str):
+    """Serve a single ``.jpg`` thumbnail from ``library/thumbnails``.
+
+    Returns a :class:`FileResponse` with ``image/jpeg`` media type. Returns
+    404 for missing files, non-.jpg names, or any path that escapes the
+    thumbnails directory.
+    """
+
+    target = _resolve_thumbnail_file(name)
+    if target is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Thumbnail not found",
+        )
+    return FileResponse(target, media_type="image/jpeg")
 
 
 @router.post(

@@ -348,6 +348,77 @@ def test_library_audio_by_name_blocks_path_traversal(monkeypatch, tmp_path):
         assert b"sensitive" not in response.content
 
 
+def test_library_thumbnail_by_name_serves_existing_jpg(monkeypatch, tmp_path):
+    """GET /library/thumbnails/{name} serves an existing .jpg file body."""
+
+    fake_thumbs = tmp_path / "thumbnails"
+    fake_thumbs.mkdir()
+    payload = b"\xff\xd8\xff\xe0" + b"\x00" * 50  # plausible JPEG head
+    (fake_thumbs / "clip.jpg").write_bytes(payload)
+
+    monkeypatch.setattr(library_route, "THUMBNAILS_DIR", fake_thumbs)
+
+    response = client.get("/library/thumbnails/clip.jpg")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/jpeg"
+    assert response.content == payload
+
+
+def test_library_thumbnail_by_name_returns_404_for_missing_file(
+    monkeypatch, tmp_path
+):
+    """GET /library/thumbnails/{name} 404s when the file does not exist."""
+
+    fake_thumbs = tmp_path / "thumbnails"
+    fake_thumbs.mkdir()
+
+    monkeypatch.setattr(library_route, "THUMBNAILS_DIR", fake_thumbs)
+
+    response = client.get("/library/thumbnails/missing.jpg")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Thumbnail not found"
+
+
+def test_library_thumbnail_by_name_returns_404_for_non_jpg(monkeypatch, tmp_path):
+    """GET /library/thumbnails/{name} 404s when the name is not a .jpg file."""
+
+    fake_thumbs = tmp_path / "thumbnails"
+    fake_thumbs.mkdir()
+    (fake_thumbs / "notes.txt").write_bytes(b"hi")
+
+    monkeypatch.setattr(library_route, "THUMBNAILS_DIR", fake_thumbs)
+
+    response = client.get("/library/thumbnails/notes.txt")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Thumbnail not found"
+
+
+def test_library_thumbnail_by_name_blocks_path_traversal(monkeypatch, tmp_path):
+    """GET /library/thumbnails/{name} never serves files outside the dir.
+
+    Separator-bearing names are rejected with 404 by the router (they don't
+    match the single-segment ``{name}`` path param), and any name that would
+    resolve outside the directory is rejected with 404 by the handler.
+    """
+
+    fake_thumbs = tmp_path / "thumbnails"
+    fake_thumbs.mkdir()
+    # Place a file outside the thumbnails dir that a naive join would reach.
+    (tmp_path / "secret.jpg").write_bytes(b"sensitive")
+
+    monkeypatch.setattr(library_route, "THUMBNAILS_DIR", fake_thumbs)
+
+    # Every path-escaping or slash-bearing name must be rejected with 404
+    # and must never return the secret file's bytes.
+    for bad in ("../secret.jpg", "..\\secret.jpg", "/etc/passwd", "sub/clip.jpg"):
+        response = client.get(f"/library/thumbnails/{bad}")
+        assert response.status_code == 404, bad
+        assert b"sensitive" not in response.content
+
+
 def test_library_tags_returns_empty_when_no_db(monkeypatch, tmp_path):
     """GET /library/tags returns {"items": []} before any database exists."""
 
