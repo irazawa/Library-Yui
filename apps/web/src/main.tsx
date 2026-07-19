@@ -6,6 +6,7 @@ const API_BASE_URL = 'http://127.0.0.1:8787';
 const LIBRARY_SUMMARY_URL = `${API_BASE_URL}/library/summary`;
 const LIBRARY_AUDIO_URL = `${API_BASE_URL}/library/audio`;
 const LIBRARY_VIDEO_URL = `${API_BASE_URL}/library/video`;
+const LIBRARY_THUMBNAILS_URL = `${API_BASE_URL}/library/thumbnails`;
 const JOBS_URL = `${API_BASE_URL}/jobs`;
 const UPLOAD_URL = `${API_BASE_URL}/library/upload`;
 const UPLOADS_URL = `${API_BASE_URL}/library/uploads`;
@@ -39,6 +40,20 @@ interface VideoListResponse {
 /** Build the per-file streaming URL for a video item name. */
 function videoUrlFor(name: string): string {
   return `${LIBRARY_VIDEO_URL}/${encodeURIComponent(name)}`;
+}
+
+/**
+ * Build the best-effort thumbnail URL for a video item name.
+ *
+ * The backend stores thumbnails as `<video-stem>.jpg` in
+ * `library/thumbnails/`, so we drop the video's file extension and append
+ * `.jpg`. The returned URL is used directly in an `<img onError>` handler —
+ * a 404 (no thumbnail yet, or ffmpeg disabled) simply falls back to the
+ * placeholder and never surfaces an error to the user.
+ */
+function thumbnailUrlFor(videoName: string): string {
+  const stem = videoName.replace(/\.[^./\\]+$/, '');
+  return `${LIBRARY_THUMBNAILS_URL}/${encodeURIComponent(stem)}.jpg`;
 }
 
 interface JobResponse {
@@ -463,6 +478,20 @@ function App() {
             <ul className="audio-list">
               {videoItems.map((item) => (
                 <li key={item.name} className="video-item">
+                  <span className="video-thumb-wrap">
+                    <span className="video-thumb-placeholder" aria-hidden="true">▶</span>
+                    <img
+                      className="video-thumb"
+                      src={thumbnailUrlFor(item.name)}
+                      alt=""
+                      loading="lazy"
+                      onError={(e) => {
+                        // Thumbnail missing/unavailable — hide the broken
+                        // image so the placeholder behind it shows through.
+                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  </span>
                   <button
                     type="button"
                     className="video-play"
