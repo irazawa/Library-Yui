@@ -1,11 +1,18 @@
 import logging
+from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, HttpUrl
 
-from app.downloader import download_mp3, download_mp4, is_downloads_enabled
+from app.downloader import (
+    download_mp3,
+    download_mp4,
+    extract_thumbnail,
+    is_downloads_enabled,
+)
 from app.jobs import create_job, get_job, list_jobs, update_job_status
+from app.storage import VIDEO_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -144,6 +151,11 @@ def _maybe_run_download(job_id: str) -> JobResponse | None:
 
     if result["ok"]:
         updated = update_job_status(job_id, "completed")
+        # For a successful video download, also extract a best-effort
+        # thumbnail using ffmpeg. ``extract_thumbnail`` is non-raising and
+        # flag-gated; this step must never fail the job.
+        if mode == "video":
+            _maybe_extract_thumbnails()
     else:
         logger.warning(
             "Download returned non-zero exit code %s for job %s",
@@ -155,6 +167,31 @@ def _maybe_run_download(job_id: str) -> JobResponse | None:
     if updated is not None:
         return JobResponse(**updated)
     return None
+
+
+def _maybe_extract_thumbnails() -> None:
+    """Extract best-effort thumbnails for the MP4 files currently in
+    ``VIDEO_DIR``.
+
+    Runs after a successful ``mode == "video"`` download. The yt-dlp output
+    template is ``<VIDEO_DIR>/%(title)s.%(ext)s`` and the downloader result
+    dict does not currently surface the produced file path, so we scan the
+    video directory for ``.mp4`` files and feed each one to
+    :func:`extract_thumbnail` (which is non-raising, flag-gated, and skips
+    silently when ffmpeg is missing or the input is unreadable).
+
+    This step must never fail the job. Any unexpected error is swallowed and
+    logged so a thumbnail/ffmpeg problem cannot turn a completed download
+    into a failed one.
+    """
+
+    try:
+        if not Path(VIDEO_DIR).is_dir():
+            return
+        for mp4 in sorted(Path(VIDEO_DIR).glob("*.mp4")):
+            extract_thumbnail(mp4)
+    except Exception:  # pragma: no cover - defensive guard
+        logger.exception("Thumbnail extraction raised; ignoring")
 
 
 @router.post("/jobs/{job_id}/complete", response_model=JobResponse)

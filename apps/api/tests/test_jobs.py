@@ -454,6 +454,163 @@ def test_start_job_calls_download_mp3_for_audio_mode(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
+# Thumbnail extraction wiring (mode == "video", flag-gated, best-effort)
+# ---------------------------------------------------------------------------
+
+def test_start_job_video_mode_invokes_thumbnail_extraction(monkeypatch):
+    """A successful ``mode == "video"`` download should trigger the
+    best-effort thumbnail extraction step (``extract_thumbnail``), while the
+    job still ends in ``completed``."""
+
+    monkeypatch.setenv(DOWNLOADS_ENABLED_FLAG, "1")
+
+    def fake_mp4(url, output_dir=None):
+        return {"ok": True, "returncode": 0, "command": ["yt-dlp", url]}
+
+    # Capture thumbnail extraction calls. We monkeypatch the function on the
+    # routes module because that is the name imported there.
+    thumb_calls = {"count": 0}
+
+    def fake_extract(*args, **kwargs):
+        thumb_calls["count"] += 1
+        return {"ok": True, "skipped": False, "path": "fake", "returncode": 0}
+
+    monkeypatch.setattr(jobs_routes, "download_mp4", fake_mp4)
+    monkeypatch.setattr(jobs_routes, "extract_thumbnail", fake_extract)
+    # Give VIDEO_DIR a real tmp dir with one fake mp4 so the helper reaches
+    # the extract_thumbnail call.
+    import tempfile
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as d:
+        video_dir = Path(d)
+        (video_dir / "clip.mp4").write_bytes(b"fake")
+        monkeypatch.setattr(jobs_routes, "VIDEO_DIR", video_dir)
+
+        client = TestClient(app)
+        created = client.post(
+            "/jobs",
+            json={
+                "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                "mode": "video",
+            },
+        ).json()
+        job_id = created["id"]
+
+        response = client.post(f"/jobs/{job_id}/start")
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "completed"
+        assert thumb_calls["count"] == 1
+
+
+def test_start_job_audio_mode_does_not_invoke_thumbnail_extraction(monkeypatch):
+    """A ``mode == "audio"`` download must NOT trigger thumbnail extraction."""
+
+    monkeypatch.setenv(DOWNLOADS_ENABLED_FLAG, "1")
+
+    def fake_mp3(url, output_dir=None):
+        return {"ok": True, "returncode": 0, "command": ["yt-dlp", url]}
+
+    thumb_calls = {"count": 0}
+
+    def fake_extract(*args, **kwargs):
+        thumb_calls["count"] += 1
+        return {"ok": False, "skipped": True, "path": None, "returncode": None}
+
+    monkeypatch.setattr(jobs_routes, "download_mp3", fake_mp3)
+    monkeypatch.setattr(jobs_routes, "extract_thumbnail", fake_extract)
+
+    client = TestClient(app)
+    created = client.post(
+        "/jobs",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"},
+    ).json()
+    job_id = created["id"]
+
+    response = client.post(f"/jobs/{job_id}/start")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "completed"
+    assert thumb_calls["count"] == 0
+
+
+def test_start_job_video_mode_thumbnail_failure_does_not_fail_job(monkeypatch):
+    """If ``extract_thumbnail`` raises, the job must still report
+    ``completed`` — the thumbnail step is best-effort and never fails the
+    job."""
+
+    monkeypatch.setenv(DOWNLOADS_ENABLED_FLAG, "1")
+
+    def fake_mp4(url, output_dir=None):
+        return {"ok": True, "returncode": 0, "command": ["yt-dlp", url]}
+
+    def exploding_extract(*args, **kwargs):
+        raise RuntimeError("ffmpeg exploded")
+
+    monkeypatch.setattr(jobs_routes, "download_mp4", fake_mp4)
+    monkeypatch.setattr(jobs_routes, "extract_thumbnail", exploding_extract)
+
+    import tempfile
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as d:
+        video_dir = Path(d)
+        (video_dir / "clip.mp4").write_bytes(b"fake")
+        monkeypatch.setattr(jobs_routes, "VIDEO_DIR", video_dir)
+
+        client = TestClient(app)
+        created = client.post(
+            "/jobs",
+            json={
+                "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                "mode": "video",
+            },
+        ).json()
+        job_id = created["id"]
+
+        response = client.post(f"/jobs/{job_id}/start")
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "completed"
+
+
+def test_start_job_video_mode_skips_thumbnail_when_video_dir_missing(monkeypatch):
+    """When ``VIDEO_DIR`` does not exist on disk, thumbnail extraction is
+    skipped silently — the helper must not crash and the job still completes."""
+
+    monkeypatch.setenv(DOWNLOADS_ENABLED_FLAG, "1")
+
+    def fake_mp4(url, output_dir=None):
+        return {"ok": True, "returncode": 0, "command": ["yt-dlp", url]}
+
+    thumb_calls = {"count": 0}
+
+    def fake_extract(*args, **kwargs):
+        thumb_calls["count"] += 1
+        return {"ok": False, "skipped": True, "path": None, "returncode": None}
+
+    monkeypatch.setattr(jobs_routes, "download_mp4", fake_mp4)
+    monkeypatch.setattr(jobs_routes, "extract_thumbnail", fake_extract)
+    # Point VIDEO_DIR at a path that does not exist.
+    monkeypatch.setattr(jobs_routes, "VIDEO_DIR", __import__("pathlib").Path("/no/such/dir/xyz"))
+
+    client = TestClient(app)
+    created = client.post(
+        "/jobs",
+        json={
+            "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "mode": "video",
+        },
+    ).json()
+    job_id = created["id"]
+
+    response = client.post(f"/jobs/{job_id}/start")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "completed"
+    assert thumb_calls["count"] == 0
+
+
+# ---------------------------------------------------------------------------
 # POST /jobs `mode` field (audio | video)
 # ---------------------------------------------------------------------------
 
