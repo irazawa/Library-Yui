@@ -98,7 +98,7 @@ Library-Yui conventions (filesystem-based library, `app/downloader.py`,
 SQLite `metadata` store, in-memory job store).
 
 - [x] Add an audio streaming endpoint `GET /library/audio/{name}` mirroring `GET /library/video/{name}` (FileResponse `audio/mpeg`, HTTP range support, 404 + path-traversal protection) plus tests in `tests/test_library.py`.
-- [ ] Extend `GET /library/audio` to also return file `size` and `duration` (best-effort, reusing the existing `_probe_mp4_duration` container parser from `library.py`) alongside the name; add tests in `tests/test_library.py`.
+- [x] Extend `GET /library/audio` to also return file `size` and `duration` (best-effort, reusing the existing `_probe_mp4_duration` container parser from `library.py`) alongside the name; add tests in `tests/test_library.py`.
 - [ ] Wire the ffmpeg thumbnail extraction helper (`extract_thumbnail` from `app/downloader.py`) into the `/jobs/{id}/start` flag-gated path so that a successful `mode == "video"` download also produces `library/thumbnails/<stem>.jpg` (best-effort, never fails the job); add tests in `tests/test_jobs.py`.
 - [ ] Add a `GET /library/thumbnails/{name}` endpoint serving a single `.jpg` thumbnail from `library/thumbnails` with 404 + path-traversal protection (mirroring `_resolve_video_file`); add tests in `tests/test_library.py`.
 - [ ] Show generated thumbnails next to video items in the main web app Video card (best-effort `<img src="/api/library/thumbnails/{name}.jpg">` with `onError` fallback to a placeholder); verify with `npm run build` in `apps/web`.

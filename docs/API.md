@@ -88,21 +88,27 @@ curl http://127.0.0.1:8787/library/summary
 Returns the names of MP3 files in the audio library folder, sorted alphabetically.
 Only `.mp3` files are included. A missing directory returns an empty list.
 
+Each item carries a best-effort `size` (bytes from the filesystem) and
+`duration` (seconds, parsed from an MP4/MOV `moov`/`mvhd` container header
+when present; `null` otherwise — never raises).
+
 ### Response — `200 OK`
 
 ```json
 {
   "items": [
-    { "name": "song-a.mp3" },
-    { "name": "song-b.mp3" }
+    { "name": "song-a.mp3", "size": 4096000, "duration": null },
+    { "name": "song-b.mp3", "size": 5120000, "duration": 197.5 }
   ]
 }
 ```
 
-| Field               | Type   | Description                                         |
-| ------------------- | ------ | --------------------------------------------------- |
-| `items`             | array  | List of audio items.                                |
-| `items[].name`      | string | File name of the MP3 (no path).                     |
+| Field               | Type           | Description                                                            |
+| ------------------- | -------------- | ---------------------------------------------------------------------- |
+| `items`             | array          | List of audio items.                                                   |
+| `items[].name`      | string         | File name of the MP3 (no path).                                        |
+| `items[].size`      | integer        | File size in bytes (`0` on `stat` failure).                            |
+| `items[].duration`  | number \| null | Best-effort duration in seconds (container-parsed), or `null`.         |
 
 ### Example
 

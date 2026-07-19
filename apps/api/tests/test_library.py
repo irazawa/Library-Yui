@@ -17,12 +17,12 @@ def test_library_summary_returns_counts_for_all_storage_types():
 
 
 def test_library_audio_returns_list_of_mp3_files(monkeypatch, tmp_path):
-    """GET /library/audio should return only .mp3 files by name, sorted."""
+    """GET /library/audio should return only .mp3 files by name, sorted, with size/duration."""
 
     fake_audio = tmp_path / "audio"
     fake_audio.mkdir()
-    (fake_audio / "a.mp3").write_bytes(b"")
-    (fake_audio / "B.mp3").write_bytes(b"")
+    (fake_audio / "a.mp3").write_bytes(b"\x00\x01\x02\x03")
+    (fake_audio / "B.mp3").write_bytes(b"\x00")
     (fake_audio / "skip.txt").write_bytes(b"")
     (fake_audio / "ignore.MP4").write_bytes(b"")
 
@@ -32,7 +32,12 @@ def test_library_audio_returns_list_of_mp3_files(monkeypatch, tmp_path):
 
     assert response.status_code == 200
     body = response.json()
-    assert body == {"items": [{"name": "a.mp3"}, {"name": "B.mp3"}]}
+    assert body == {
+        "items": [
+            {"name": "a.mp3", "size": 4, "duration": None},
+            {"name": "B.mp3", "size": 1, "duration": None},
+        ]
+    }
 
 
 def test_library_audio_returns_empty_when_directory_missing(monkeypatch, tmp_path):
@@ -42,6 +47,53 @@ def test_library_audio_returns_empty_when_directory_missing(monkeypatch, tmp_pat
 
     assert response.status_code == 200
     assert response.json() == {"items": []}
+
+
+def test_library_audio_returns_duration_from_container_header(
+    monkeypatch, tmp_path
+):
+    """GET /library/audio exposes a best-effort duration when the .mp3 file
+    is wrapped in an MP4/MOV container (probed via the moov/mvhd header)."""
+
+    fake_audio = tmp_path / "audio"
+    fake_audio.mkdir()
+    payload = _make_minimal_mp4(duration_seconds=3.0, timescale=1000)
+    (fake_audio / "clip.mp3").write_bytes(payload)
+
+    monkeypatch.setattr(library_route, "AUDIO_DIR", fake_audio)
+
+    response = client.get("/library/audio")
+
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert len(items) == 1
+    item = items[0]
+    assert item["name"] == "clip.mp3"
+    assert item["size"] == len(payload)
+    assert item["duration"] == pytest.approx(3.0, rel=1e-6)
+
+
+def test_library_audio_returns_duration_none_for_non_mp4_container(
+    monkeypatch, tmp_path
+):
+    """A plain .mp3 (no MP4 container) still returns name+size and ``None`` duration."""
+
+    fake_audio = tmp_path / "audio"
+    fake_audio.mkdir()
+    payload = b"ID3" + b"\x00" * 200  # plausible-ish MP3 head, no moov box
+    (fake_audio / "song.mp3").write_bytes(payload)
+
+    monkeypatch.setattr(library_route, "AUDIO_DIR", fake_audio)
+
+    response = client.get("/library/audio")
+
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert len(items) == 1
+    item = items[0]
+    assert item["name"] == "song.mp3"
+    assert item["size"] == len(payload)
+    assert item["duration"] is None
 
 
 def test_library_video_returns_list_of_mp4_files(monkeypatch, tmp_path):

@@ -34,6 +34,8 @@ class LibrarySummaryResponse(BaseModel):
 
 class AudioItem(BaseModel):
     name: str
+    size: int
+    duration: float | None
 
 
 class AudioListResponse(BaseModel):
@@ -220,18 +222,26 @@ def get_library_summary() -> LibrarySummaryResponse:
 def list_audio() -> AudioListResponse:
     """Return the names of MP3 files in the audio library folder.
 
-    Missing directories return an empty list so the endpoint works before
-    any downloads have happened.
+    Each item includes its file size in bytes and a best-effort duration in
+    seconds. The duration is parsed from an MP4/MOV container header when
+    present (some MP3 files are muxed in an MP4 container) and falls back to
+    ``None`` otherwise — it never raises. Missing directories return an empty
+    list so the endpoint works before any downloads have happened.
     """
 
     if not AUDIO_DIR.is_dir():
         return AudioListResponse(items=[])
 
-    items = [
-        AudioItem(name=entry.name)
-        for entry in sorted(AUDIO_DIR.iterdir())
-        if entry.is_file() and entry.suffix.lower() == ".mp3"
-    ]
+    items: list[AudioItem] = []
+    for entry in sorted(AUDIO_DIR.iterdir()):
+        if not (entry.is_file() and entry.suffix.lower() == ".mp3"):
+            continue
+        try:
+            size = entry.stat().st_size
+        except OSError:
+            size = 0
+        duration = _probe_mp4_duration(entry)
+        items.append(AudioItem(name=entry.name, size=size, duration=duration))
     return AudioListResponse(items=items)
 
 
