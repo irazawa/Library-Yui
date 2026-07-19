@@ -314,6 +314,59 @@ def stream_video(name: str):
     return FileResponse(target, media_type="video/mp4")
 
 
+def _resolve_audio_file(name: str) -> Path | None:
+    """Resolve ``name`` to a real .mp3 file inside ``AUDIO_DIR``.
+
+    Returns the resolved :class:`Path` when the name points to an existing
+    ``.mp3`` file directly inside the audio library directory, or ``None``
+    when the file is missing, not an .mp3, or escapes the directory (path
+    traversal). ``None`` lets the caller respond with a uniform 404 without
+    leaking whether a file exists.
+    """
+
+    if not name or "/" in name or "\\" in name:
+        return None
+    if Path(name).suffix.lower() != ".mp3":
+        return None
+
+    try:
+        base = AUDIO_DIR.resolve()
+    except OSError:
+        return None
+    try:
+        target = (AUDIO_DIR / name).resolve()
+    except OSError:
+        return None
+
+    # Ensure the resolved target is a direct child of the audio directory.
+    if target.parent != base:
+        return None
+    if not target.is_file():
+        return None
+    return target
+
+
+@router.get(
+    "/library/audio/{name}",
+    response_class=FileResponse,
+)
+def stream_audio(name: str):
+    """Stream a single ``.mp3`` file from ``library/audio``.
+
+    Returns a :class:`FileResponse` with ``audio/mpeg`` media type so clients
+    can play it with HTTP range requests. Returns 404 for missing files,
+    non-.mp3 names, or any path that escapes the audio directory.
+    """
+
+    target = _resolve_audio_file(name)
+    if target is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Audio not found",
+        )
+    return FileResponse(target, media_type="audio/mpeg")
+
+
 @router.post(
     "/library/upload",
     response_model=UploadResponse,

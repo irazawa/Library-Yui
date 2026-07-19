@@ -225,6 +225,77 @@ def test_library_video_by_name_blocks_path_traversal(monkeypatch, tmp_path):
         assert b"sensitive" not in response.content
 
 
+def test_library_audio_by_name_streams_existing_mp3(monkeypatch, tmp_path):
+    """GET /library/audio/{name} streams an existing .mp3 file body."""
+
+    fake_audio = tmp_path / "audio"
+    fake_audio.mkdir()
+    payload = b"ID3" + b"\x00" * 200  # plausible-ish MP3 head
+    (fake_audio / "track.mp3").write_bytes(payload)
+
+    monkeypatch.setattr(library_route, "AUDIO_DIR", fake_audio)
+
+    response = client.get("/library/audio/track.mp3")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "audio/mpeg"
+    assert response.content == payload
+
+
+def test_library_audio_by_name_returns_404_for_missing_file(
+    monkeypatch, tmp_path
+):
+    """GET /library/audio/{name} 404s when the file does not exist."""
+
+    fake_audio = tmp_path / "audio"
+    fake_audio.mkdir()
+
+    monkeypatch.setattr(library_route, "AUDIO_DIR", fake_audio)
+
+    response = client.get("/library/audio/missing.mp3")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Audio not found"
+
+
+def test_library_audio_by_name_returns_404_for_non_mp3(monkeypatch, tmp_path):
+    """GET /library/audio/{name} 404s when the name is not a .mp3 file."""
+
+    fake_audio = tmp_path / "audio"
+    fake_audio.mkdir()
+    (fake_audio / "notes.txt").write_bytes(b"hi")
+
+    monkeypatch.setattr(library_route, "AUDIO_DIR", fake_audio)
+
+    response = client.get("/library/audio/notes.txt")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Audio not found"
+
+
+def test_library_audio_by_name_blocks_path_traversal(monkeypatch, tmp_path):
+    """GET /library/audio/{name} never serves files outside the audio dir.
+
+    Separator-bearing names are rejected with 404 by the router (they don't
+    match the single-segment ``{name}`` path param), and any name that would
+    resolve outside the directory is rejected with 404 by the handler.
+    """
+
+    fake_audio = tmp_path / "audio"
+    fake_audio.mkdir()
+    # Place a file outside the audio dir that a naive join would reach.
+    (tmp_path / "secret.mp3").write_bytes(b"sensitive")
+
+    monkeypatch.setattr(library_route, "AUDIO_DIR", fake_audio)
+
+    # Every path-escaping or slash-bearing name must be rejected with 404
+    # and must never return the secret file's bytes.
+    for bad in ("../secret.mp3", "..\\secret.mp3", "/etc/passwd", "sub/track.mp3"):
+        response = client.get(f"/library/audio/{bad}")
+        assert response.status_code == 404, bad
+        assert b"sensitive" not in response.content
+
+
 def test_library_tags_returns_empty_when_no_db(monkeypatch, tmp_path):
     """GET /library/tags returns {"items": []} before any database exists."""
 
