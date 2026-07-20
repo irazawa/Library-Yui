@@ -278,6 +278,15 @@ function App() {
   const [uploadsRefreshKey, setUploadsRefreshKey] = useState(0);
   const { items: uploadItems, loading: uploadsLoading } = useLibraryUploads(uploadsRefreshKey);
   const [uploadsFilter, setUploadsFilter] = useState('');
+  // Global dismissible error banner. Surfacing already-caught local failures
+  // (upload/download/poll) at the top of the page so the user always notices
+  // them even when scrolled past the inline error notes.
+  const [notice, setNotice] = useState<string | null>(null);
+  // Mirror the polling hook's error into the global banner without changing
+  // the hook's API.
+  useEffect(() => {
+    if (jobPollError) setNotice(`Job status update failed: ${jobPollError}`);
+  }, [jobPollError]);
   const filterNeedle = uploadsFilter.trim().toLowerCase();
   const visibleUploadItems =
     filterNeedle === ''
@@ -299,7 +308,9 @@ function App() {
       setUploadNote(`Uploaded: ${saved.filename}`);
       setUploadsRefreshKey((k) => k + 1);
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : 'Upload failed');
+      const msg = err instanceof Error ? err.message : 'Upload failed';
+      setUploadError(msg);
+      setNotice(`Upload failed: ${msg}`);
     } finally {
       setUploading(false);
       // Allow re-selecting the same file to trigger onChange again.
@@ -324,7 +335,9 @@ function App() {
       const job = (await res.json()) as { id: string };
       setJobId(job.id);
     } catch (err) {
-      setJobError(err instanceof Error ? err.message : 'Request failed');
+      const msg = err instanceof Error ? err.message : 'Request failed';
+      setJobError(msg);
+      setNotice(`Could not create job: ${msg}`);
     } finally {
       setSubmitting(false);
     }
@@ -366,6 +379,19 @@ function App() {
 
   return (
     <main className="shell">
+      {notice && (
+        <div className="notice-banner" role="alert">
+          <span className="notice-text">{notice}</span>
+          <button
+            type="button"
+            className="notice-close"
+            aria-label="Dismiss notice"
+            onClick={() => setNotice(null)}
+          >
+            ✕
+          </button>
+        </div>
+      )}
       <section className="hero">
         <p className="eyebrow">Library-Yui · MVP 0</p>
         <h1>Your personal music/video library starts here.</h1>
