@@ -62,6 +62,18 @@ def init_db(db_path: Path | str = DEFAULT_DB_PATH) -> None:
         - ``metadata_id``: references ``metadata.id``.
         - ``tag_id``: references ``tags.id``.
         - Primary key on ``(metadata_id, tag_id)`` keeps assignments unique.
+
+    ``jobs`` table (persistence / MVP 5, schema-only for now):
+        - ``id``: TEXT primary key (the job UUID).
+        - ``url``: the source YouTube URL.
+        - ``mode``: ``audio`` or ``video`` download mode.
+        - ``status``: ``pending`` | ``downloading`` | ``completed`` | ``failed``.
+        - ``created_at``: ISO-8601 UTC timestamp of job creation.
+        - ``updated_at``: ISO-8601 UTC timestamp of last status change.
+
+    Note: the in-memory job store in :mod:`app.jobs` is intentionally left
+    untouched; the table is created here so future tasks can wire persistence
+    without an extra migration.
     """
 
     connection = get_connection(db_path)
@@ -92,6 +104,18 @@ def init_db(db_path: Path | str = DEFAULT_DB_PATH) -> None:
                 metadata_id INTEGER NOT NULL REFERENCES metadata(id) ON DELETE CASCADE,
                 tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
                 PRIMARY KEY (metadata_id, tag_id)
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS jobs (
+                id TEXT PRIMARY KEY,
+                url TEXT NOT NULL,
+                mode TEXT NOT NULL,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
             )
             """
         )
