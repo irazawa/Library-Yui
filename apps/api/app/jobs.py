@@ -1,14 +1,24 @@
 """In-memory job store for download jobs.
 
-This is a minimal placeholder store so the API can create and track jobs
-before a real persistence layer exists. Jobs are keyed by a UUID string and
-hold their source URL plus a simple lifecycle status.
+Jobs are keyed by a UUID string and hold their source URL plus a simple
+lifecycle status. In addition to the in-memory store (the source of truth
+for the API), created/updated jobs are dual-written best-effort into the
+SQLite ``jobs`` table managed by :mod:`app.database`, so they survive
+process restarts once a future task wires a read-back path. Any database
+error is swallowed so the in-memory store is never affected.
 """
 
 from __future__ import annotations
 
+import logging
+import sqlite3
 import uuid
+from datetime import datetime, timezone
 from typing import TypedDict
+
+from app.database import DEFAULT_DB_PATH, get_connection, init_db
+
+logger = logging.getLogger(__name__)
 
 
 class JobRecord(TypedDict):
@@ -19,14 +29,66 @@ class JobRecord(TypedDict):
 
 
 # Module-level store shared across requests within the same process.
-# A future iteration will replace this with durable persistence.
 _JOBS: dict[str, JobRecord] = {}
+
+# Side-table of ISO-8601 (UTC) timestamps keyed by job id. Kept separate
+# from :class:`JobRecord` so the API response shape (id/url/status/mode)
+# stays stable; these are used only for best-effort SQLite persistence.
+_JOB_TIMESTAMPS: dict[str, dict[str, str]] = {}
 
 
 # Allowed download modes. ``audio`` extracts an MP3; ``video`` downloads an
 # MP4. Defaults to ``audio`` to preserve the legacy downloader behavior.
 ALLOWED_MODES = ("audio", "video")
 DEFAULT_MODE = "audio"
+
+# SQLite database path used for best-effort job persistence. Defaults to the
+# shared Library-Yui database; tests override it via :func:`set_jobs_db_path`.
+_jobs_db_path = DEFAULT_DB_PATH
+
+
+def set_jobs_db_path(path: object) -> None:
+    """Override the database path used for job persistence (intended for tests)."""
+
+    global _jobs_db_path
+    _jobs_db_path = path
+
+
+def _now_iso() -> str:
+    """Return the current UTC time as an ISO-8601 string."""
+
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _persist_job(job: JobRecord, created_at: str, updated_at: str) -> None:
+    """Best-effort upsert of *job* into the SQLite ``jobs`` table.
+
+    Any database error is logged and swallowed so the in-memory store — the
+    source of truth for the API — is never affected. The ``jobs`` table is
+    created lazily via :func:`init_db` on the configured database path. On
+    conflict (status update) only ``url``/``mode``/``status``/``updated_at``
+    are refreshed, leaving the original ``created_at`` intact.
+    """
+
+    try:
+        init_db(_jobs_db_path)
+        connection = get_connection(_jobs_db_path)
+        try:
+            connection.execute(
+                "INSERT INTO jobs (id, url, mode, status, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(id) DO UPDATE SET "
+                "url=excluded.url, mode=excluded.mode, "
+                "status=excluded.status, updated_at=excluded.updated_at",
+                (job["id"], job["url"], job["mode"], job["status"], created_at, updated_at),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+    except sqlite3.Error as exc:
+        logger.warning("Job persistence failed for %s: %s", job["id"], exc)
+    except Exception:  # pragma: no cover - defensive guard
+        logger.exception("Unexpected error persisting job %s", job["id"])
 
 
 def create_job(url: str, mode: str = DEFAULT_MODE) -> JobRecord:
@@ -40,8 +102,11 @@ def create_job(url: str, mode: str = DEFAULT_MODE) -> JobRecord:
     """
 
     job_id = uuid.uuid4().hex
+    now = _now_iso()
     job: JobRecord = {"id": job_id, "url": url, "status": "pending", "mode": mode}
     _JOBS[job_id] = job
+    _JOB_TIMESTAMPS[job_id] = {"created_at": now, "updated_at": now}
+    _persist_job(job, now, now)
     return job
 
 
@@ -71,6 +136,11 @@ def update_job_status(job_id: str, new_status: str) -> JobRecord | None:
     if job is None:
         return None
     job["status"] = new_status
+    ts = _JOB_TIMESTAMPS.get(job_id)
+    created_at = ts["created_at"] if ts else _now_iso()
+    updated_at = _now_iso()
+    _JOB_TIMESTAMPS[job_id] = {"created_at": created_at, "updated_at": updated_at}
+    _persist_job(job, created_at, updated_at)
     return job
 
 
@@ -78,3 +148,4 @@ def reset_jobs() -> None:
     """Clear all jobs. Intended for tests."""
 
     _JOBS.clear()
+    _JOB_TIMESTAMPS.clear()

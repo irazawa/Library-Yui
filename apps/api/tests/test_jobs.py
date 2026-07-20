@@ -1,8 +1,10 @@
 from fastapi.testclient import TestClient
 
+from app import database
 from app import downloader as downloader_mod
+from app import jobs as jobs_mod
 from app.downloader import DOWNLOADS_ENABLED_FLAG
-from app.jobs import reset_jobs
+from app.jobs import create_job, get_job, reset_jobs, set_jobs_db_path
 from app.routes import jobs as jobs_routes
 from main import app
 
@@ -680,3 +682,99 @@ def test_create_job_rejects_unknown_mode_with_422() -> None:
     errs = response.json().get("detail", [])
     locs = [loc[-1] for loc in (e.get("loc", []) for e in errs)]
     assert "mode" in locs
+
+
+# ---------------------------------------------------------------------------
+# SQLite dual-write persistence tests
+# ---------------------------------------------------------------------------
+
+import sqlite3
+
+
+def _read_job_rows(db_path) -> list[dict]:
+    connection = sqlite3.connect(str(db_path))
+    connection.row_factory = sqlite3.Row
+    try:
+        rows = connection.execute(
+            "SELECT id, url, mode, status, created_at, updated_at FROM jobs"
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        connection.close()
+
+
+def test_created_job_is_persisted_to_sqlite(tmp_path) -> None:
+    """A created job should also be present in the SQLite ``jobs`` table."""
+
+    db_path = tmp_path / "library.db"
+    set_jobs_db_path(db_path)
+    try:
+        client = TestClient(app)
+        created = client.post(
+            "/jobs",
+            json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"},
+        ).json()
+
+        rows = _read_job_rows(db_path)
+        assert len(rows) == 1
+        row = rows[0]
+        assert row["id"] == created["id"]
+        assert row["url"] == created["url"]
+        assert row["mode"] == "audio"
+        assert row["status"] == "pending"
+        # Both timestamps are ISO-8601 strings.
+        assert isinstance(row["created_at"], str) and row["created_at"]
+        assert isinstance(row["updated_at"], str) and row["updated_at"]
+    finally:
+        set_jobs_db_path(database.DEFAULT_DB_PATH)
+
+
+def test_job_status_update_is_persisted_to_sqlite(tmp_path) -> None:
+    """Transitioning a job via ``/complete`` should be reflected in SQLite."""
+
+    db_path = tmp_path / "library.db"
+    set_jobs_db_path(db_path)
+    try:
+        client = TestClient(app)
+        created = client.post(
+            "/jobs",
+            json={"url": "https://youtu.be/abcdefghijk", "mode": "video"},
+        ).json()
+        job_id = created["id"]
+
+        # created_at captured before transition.
+        before = _read_job_rows(db_path)[0]
+        original_created = before["created_at"]
+
+        client.post(f"/jobs/{job_id}/complete")
+
+        rows = _read_job_rows(db_path)
+        assert len(rows) == 1
+        row = rows[0]
+        assert row["id"] == job_id
+        assert row["mode"] == "video"
+        assert row["status"] == "completed"
+        # created_at must be preserved on update; updated_at must change.
+        assert row["created_at"] == original_created
+        assert row["updated_at"] != original_created
+    finally:
+        set_jobs_db_path(database.DEFAULT_DB_PATH)
+
+
+def test_job_persistence_swallows_db_error(monkeypatch, tmp_path) -> None:
+    """A database failure during ``create_job`` must not break the in-memory store."""
+
+    def boom(*args, **kwargs):
+        raise sqlite3.OperationalError("disk full")
+
+    monkeypatch.setattr(jobs_mod, "init_db", boom)
+    set_jobs_db_path(tmp_path / "library.db")
+    try:
+        job = create_job("https://www.youtube.com/watch?v=dQw4w9WgXcQ", mode="audio")
+        # In-memory store still holds the job.
+        assert job["status"] == "pending"
+        assert get_job(job["id"]) is not None
+        # No database file was written.
+        assert not (tmp_path / "library.db").is_file()
+    finally:
+        set_jobs_db_path(database.DEFAULT_DB_PATH)

@@ -116,7 +116,7 @@ Adapted to Library-Yui conventions (SQLite `metadata`/`tags`/`metadata_tags`/
 `app/jobs.py`, filesystem-based `library/` storage, `app/downloader.py`
 flag-gated downloads).
 
-- [ ] Dual-write job persistence: extend `create_job()` and `update_job_status()` in `apps/api/app/jobs.py` to also insert/update a row in the SQLite `jobs` table (best-effort, wrapped so a DB error never breaks the in-memory store); add tests in `tests/test_jobs.py` verifying a created/transitioned job is reflected in the DB.
+- [x] Dual-write job persistence: extend `create_job()` and `update_job_status()` in `apps/api/app/jobs.py` to also insert/update a row in the SQLite `jobs` table (best-effort, wrapped so a DB error never breaks the in-memory store); add tests in `tests/test_jobs.py` verifying a created/transitioned job is reflected in the DB.
 - [ ] Add a `DELETE /library/metadata/{id}` endpoint (`apps/api/app/routes/library.py`) that removes the metadata row, its `metadata_tags` rows, and deletes the underlying file from `library/uploads/` (best-effort file removal); return 404 for unknown ids; add tests in `tests/test_library.py`.
 - [ ] Add a `DELETE /jobs/{id}` endpoint (`apps/api/app/routes/jobs.py`) that removes a job from the in-memory store (and its SQLite row if persistence is wired); return 404 for unknown ids and 204 on success; add tests in `tests/test_jobs.py`.
 - [ ] Extend `GET /library/uploads` to accept optional `?limit=` and `?offset=` query params (defaulting to no pagination) and include a `total` count field in the response; add tests in `tests/test_upload.py` covering limit, offset, and total.
