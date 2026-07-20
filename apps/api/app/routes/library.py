@@ -11,7 +11,7 @@ from app import database
 from app.database import DEFAULT_DB_PATH
 from app.storage import AUDIO_DIR, STORAGE_DIRS, THUMBNAILS_DIR, UPLOADS_DIR, VIDEO_DIR, ensure_storage_dirs
 
-router = APIRouter(tags=["library"])
+router = APIRouter()
 
 logger = logging.getLogger(__name__)
 
@@ -212,13 +212,13 @@ def _find_top_level_box(fh, target: bytes) -> tuple[int, int] | None:
     return None
 
 
-@router.get("/library/summary", response_model=LibrarySummaryResponse)
+@router.get("/library/summary", response_model=LibrarySummaryResponse, tags=["Library"])
 def get_library_summary() -> LibrarySummaryResponse:
     counts = {name: _count_files(path) for name, path in STORAGE_DIRS.items()}
     return LibrarySummaryResponse(**counts)
 
 
-@router.get("/library/audio", response_model=AudioListResponse)
+@router.get("/library/audio", response_model=AudioListResponse, tags=["Library"])
 def list_audio() -> AudioListResponse:
     """Return the names of MP3 files in the audio library folder.
 
@@ -245,7 +245,7 @@ def list_audio() -> AudioListResponse:
     return AudioListResponse(items=items)
 
 
-@router.get("/library/video", response_model=VideoListResponse)
+@router.get("/library/video", response_model=VideoListResponse, tags=["Library"])
 def list_video() -> VideoListResponse:
     """Return the names of MP4 files in the video library folder.
 
@@ -306,6 +306,7 @@ def _resolve_video_file(name: str) -> Path | None:
 @router.get(
     "/library/video/{name}",
     response_class=FileResponse,
+    tags=["Library"],
 )
 def stream_video(name: str):
     """Stream a single ``.mp4`` file from ``library/video``.
@@ -359,6 +360,7 @@ def _resolve_audio_file(name: str) -> Path | None:
 @router.get(
     "/library/audio/{name}",
     response_class=FileResponse,
+    tags=["Library"],
 )
 def stream_audio(name: str):
     """Stream a single ``.mp3`` file from ``library/audio``.
@@ -412,6 +414,7 @@ def _resolve_thumbnail_file(name: str) -> Path | None:
 @router.get(
     "/library/thumbnails/{name}",
     response_class=FileResponse,
+    tags=["Library"],
 )
 def serve_thumbnail(name: str):
     """Serve a single ``.jpg`` thumbnail from ``library/thumbnails``.
@@ -434,6 +437,7 @@ def serve_thumbnail(name: str):
     "/library/upload",
     response_model=UploadResponse,
     status_code=status.HTTP_201_CREATED,
+    tags=["Library"],
 )
 def upload_file(file: UploadFile) -> UploadResponse:
     """Accept a multipart file upload and save it to ``library/uploads/``.
@@ -507,7 +511,7 @@ def upload_file(file: UploadFile) -> UploadResponse:
     return UploadResponse(**row)
 
 
-@router.get("/library/uploads", response_model=UploadListResponse)
+@router.get("/library/uploads", response_model=UploadListResponse, tags=["Library"])
 def list_uploads(tag: str | None = None, q: str | None = None) -> UploadListResponse:
     """Return uploaded items recorded in the SQLite database.
 
@@ -538,7 +542,7 @@ def list_uploads(tag: str | None = None, q: str | None = None) -> UploadListResp
     return UploadListResponse(items=[UploadResponse(**row) for row in rows])
 
 
-@router.get("/library/tags", response_model=TagListResponse)
+@router.get("/library/tags", response_model=TagListResponse, tags=["Collections"])
 def list_tags() -> TagListResponse:
     """Return all tag names recorded in the database, alphabetical order.
 
@@ -564,6 +568,7 @@ def list_tags() -> TagListResponse:
 @router.get(
     "/library/metadata/{metadata_id}",
     response_model=MetadataDetailResponse,
+    tags=["Collections"],
 )
 def get_metadata_detail(metadata_id: int) -> MetadataDetailResponse:
     """Return a single metadata row plus its attached tag list.
@@ -592,6 +597,7 @@ def get_metadata_detail(metadata_id: int) -> MetadataDetailResponse:
 @router.post(
     "/library/metadata/{metadata_id}/tags",
     response_model=TagAssignResponse,
+    tags=["Collections"],
 )
 def assign_tag(metadata_id: int, body: TagAssignRequest) -> TagAssignResponse:
     """Attach a tag to a metadata row.
@@ -622,6 +628,7 @@ def assign_tag(metadata_id: int, body: TagAssignRequest) -> TagAssignResponse:
 @router.delete(
     "/library/metadata/{metadata_id}/tags/{tag}",
     response_model=TagAssignResponse,
+    tags=["Collections"],
 )
 def remove_tag(metadata_id: int, tag: str) -> TagAssignResponse:
     """Detach a tag from a metadata row.

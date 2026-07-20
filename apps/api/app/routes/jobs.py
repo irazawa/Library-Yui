@@ -16,7 +16,7 @@ from app.storage import VIDEO_DIR
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["jobs"])
+router = APIRouter()
 
 
 class JobCreateRequest(BaseModel):
@@ -54,7 +54,7 @@ def _is_youtube_url(url: str) -> bool:
     )
 
 
-@router.post("/jobs", response_model=JobResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/jobs", response_model=JobResponse, status_code=status.HTTP_201_CREATED, tags=["Jobs"])
 def create_download_job(payload: JobCreateRequest) -> JobResponse:
     """Accept a YouTube URL and initialize a pending download job.
 
@@ -74,7 +74,7 @@ def create_download_job(payload: JobCreateRequest) -> JobResponse:
     return JobResponse(**job)
 
 
-@router.get("/jobs", response_model=JobListResponse)
+@router.get("/jobs", response_model=JobListResponse, tags=["Jobs"])
 def list_download_jobs() -> JobListResponse:
     """Return all jobs (id, url, status) from the in-memory store.
 
@@ -85,7 +85,7 @@ def list_download_jobs() -> JobListResponse:
     return JobListResponse(items=[JobResponse(**job) for job in list_jobs()])
 
 
-@router.get("/jobs/{job_id}", response_model=JobResponse)
+@router.get("/jobs/{job_id}", response_model=JobResponse, tags=["Jobs"])
 def get_download_job(job_id: str) -> JobResponse:
     """Return the current status of a specific download job."""
 
@@ -95,7 +95,7 @@ def get_download_job(job_id: str) -> JobResponse:
     return JobResponse(**job)
 
 
-@router.post("/jobs/{job_id}/start", response_model=JobResponse)
+@router.post("/jobs/{job_id}/start", response_model=JobResponse, tags=["Jobs"])
 def start_download_job(job_id: str) -> JobResponse:
     """Transition a job from ``pending`` to ``downloading``.
 
@@ -194,7 +194,7 @@ def _maybe_extract_thumbnails() -> None:
         logger.exception("Thumbnail extraction raised; ignoring")
 
 
-@router.post("/jobs/{job_id}/complete", response_model=JobResponse)
+@router.post("/jobs/{job_id}/complete", response_model=JobResponse, tags=["Jobs"])
 def complete_download_job(job_id: str) -> JobResponse:
     """Transition a job to ``completed``.
 

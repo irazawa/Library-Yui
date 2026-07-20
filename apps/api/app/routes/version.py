@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-router = APIRouter(tags=["version"])
+router = APIRouter()
 
 
 class VersionResponse(BaseModel):
@@ -10,7 +10,7 @@ class VersionResponse(BaseModel):
     milestone: str
 
 
-@router.get("/version", response_model=VersionResponse)
+@router.get("/version", response_model=VersionResponse, tags=["System"])
 def get_version() -> VersionResponse:
     return VersionResponse(
         app_name="Library-Yui API",

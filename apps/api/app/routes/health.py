@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-router = APIRouter(tags=["health"])
+router = APIRouter()
 
 
 class HealthResponse(BaseModel):
@@ -9,6 +9,6 @@ class HealthResponse(BaseModel):
     service: str
 
 
-@router.get("/health", response_model=HealthResponse)
+@router.get("/health", response_model=HealthResponse, tags=["System"])
 def get_health() -> HealthResponse:
     return HealthResponse(status="ok", service="library-yui-api")

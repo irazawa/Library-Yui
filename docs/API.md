@@ -4,6 +4,16 @@ Base URL (local dev): `http://127.0.0.1:8787`
 
 The API is built with FastAPI. All responses are JSON.
 
+Every endpoint is grouped under one of the following OpenAPI tags, which surface
+as sections in the interactive docs (`/docs`, `/redoc`):
+
+| Tag           | Scope                                                                  |
+| ------------- | ---------------------------------------------------------------------- |
+| `System`      | Liveness and version probes (`/health`, `/version`).                   |
+| `Jobs`        | Download job lifecycle (`/jobs`, `/jobs/{id}`, `/jobs/{id}/start`, …). |
+| `Library`     | Library listing, streaming, uploads, thumbnails, and summary.          |
+| `Collections` | Tags and per-item metadata (tags, search filters, metadata detail).    |
+
 ## `GET /health`
 
 Lightweight liveness probe. Always returns `200` if the service is running.
