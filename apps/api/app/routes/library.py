@@ -594,6 +594,61 @@ def get_metadata_detail(metadata_id: int) -> MetadataDetailResponse:
     return MetadataDetailResponse(**row, tags=tags)
 
 
+def _remove_uploaded_file_best_effort(row: dict) -> None:
+    """Remove the deleted metadata row's file if it is inside UPLOADS_DIR.
+
+    File deletion is intentionally best-effort: a missing file, permission
+    issue, or path that no longer resolves inside uploads should not undo the
+    metadata deletion or fail the API request.
+    """
+
+    try:
+        uploads_base = UPLOADS_DIR.resolve()
+        target = Path(row["path"]).resolve()
+    except (OSError, RuntimeError, KeyError, TypeError):
+        return
+
+    if target.parent != uploads_base:
+        logger.warning("Skipping metadata file cleanup outside uploads: %s", target)
+        return
+
+    try:
+        target.unlink(missing_ok=True)
+    except OSError:
+        logger.exception("Failed to remove uploaded file for metadata row %s", row.get("id"))
+
+
+@router.delete(
+    "/library/metadata/{metadata_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["Collections"],
+)
+def delete_metadata(metadata_id: int) -> None:
+    """Delete a metadata row, its tag joins, and its uploaded file.
+
+    Returns 404 when the database or row does not exist. The filesystem cleanup
+    happens after the database delete and is best-effort so stale/missing files
+    do not make the API fail.
+    """
+
+    db_file = Path(DB_PATH)
+    if not db_file.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Metadata row not found",
+        )
+
+    row = database.delete_metadata(metadata_id, DB_PATH)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Metadata row not found",
+        )
+
+    _remove_uploaded_file_best_effort(row)
+    return None
+
+
 @router.post(
     "/library/metadata/{metadata_id}/tags",
     response_model=TagAssignResponse,

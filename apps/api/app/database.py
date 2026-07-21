@@ -286,6 +286,38 @@ def get_metadata(
         connection.close()
 
 
+def delete_metadata(
+    metadata_id: int,
+    db_path: Path | str = DEFAULT_DB_PATH,
+) -> dict | None:
+    """Delete one metadata row and its tag assignments.
+
+    Returns the deleted row as a dict so callers can clean up the underlying
+    file after the database transaction commits. Returns ``None`` when the row
+    does not exist.
+    """
+
+    connection = get_connection(db_path)
+    try:
+        row = connection.execute(
+            "SELECT id, filename, path, size, content_type, uploaded_at "
+            "FROM metadata WHERE id = ?",
+            (metadata_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        deleted = dict(row)
+        connection.execute(
+            "DELETE FROM metadata_tags WHERE metadata_id = ?",
+            (metadata_id,),
+        )
+        connection.execute("DELETE FROM metadata WHERE id = ?", (metadata_id,))
+        connection.commit()
+        return deleted
+    finally:
+        connection.close()
+
+
 def list_metadata(db_path: Path | str = DEFAULT_DB_PATH) -> list[dict]:
     """Return all metadata rows as a list of dicts, newest first."""
 

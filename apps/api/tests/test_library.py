@@ -701,3 +701,87 @@ def test_get_metadata_detail_missing_db_returns_404(monkeypatch, tmp_path):
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Metadata row not found"
+
+
+def test_delete_metadata_removes_row_tags_and_uploaded_file(monkeypatch, tmp_path):
+    """DELETE /library/metadata/{id} removes DB rows and best-effort file."""
+
+    db_path = tmp_path / "test.db"
+    uploads_dir = tmp_path / "uploads"
+    uploads_dir.mkdir()
+    uploaded_file = uploads_dir / "song.mp3"
+    uploaded_file.write_bytes(b"audio")
+
+    monkeypatch.setattr(library_route, "DB_PATH", db_path)
+    monkeypatch.setattr(library_route, "UPLOADS_DIR", uploads_dir)
+
+    from app import database
+
+    database.init_db(db_path)
+    metadata_id = database.insert_metadata(
+        filename="song.mp3",
+        path=str(uploaded_file),
+        size=5,
+        content_type="audio/mpeg",
+        db_path=db_path,
+    )
+    database.add_tag_to_metadata(metadata_id, "chill", db_path=db_path)
+
+    response = client.delete(f"/library/metadata/{metadata_id}")
+
+    assert response.status_code == 204
+    assert response.content == b""
+    assert database.get_metadata(metadata_id, db_path) is None
+    assert database.list_tags_for_metadata(metadata_id, db_path) == []
+    assert not uploaded_file.exists()
+
+
+def test_delete_metadata_returns_404_for_unknown_id(monkeypatch, tmp_path):
+    db_path = tmp_path / "test.db"
+    monkeypatch.setattr(library_route, "DB_PATH", db_path)
+
+    from app import database
+
+    database.init_db(db_path)
+
+    response = client.delete("/library/metadata/9999")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Metadata row not found"
+
+
+def test_delete_metadata_missing_file_still_removes_row(monkeypatch, tmp_path):
+    """Filesystem cleanup is best-effort when the uploaded file is gone."""
+
+    db_path = tmp_path / "test.db"
+    uploads_dir = tmp_path / "uploads"
+    uploads_dir.mkdir()
+    missing_file = uploads_dir / "missing.bin"
+
+    monkeypatch.setattr(library_route, "DB_PATH", db_path)
+    monkeypatch.setattr(library_route, "UPLOADS_DIR", uploads_dir)
+
+    from app import database
+
+    database.init_db(db_path)
+    metadata_id = database.insert_metadata(
+        filename="missing.bin",
+        path=str(missing_file),
+        size=1,
+        content_type="application/octet-stream",
+        db_path=db_path,
+    )
+
+    response = client.delete(f"/library/metadata/{metadata_id}")
+
+    assert response.status_code == 204
+    assert database.get_metadata(metadata_id, db_path) is None
+
+
+def test_delete_metadata_missing_db_returns_404(monkeypatch, tmp_path):
+    monkeypatch.setattr(library_route, "DB_PATH", tmp_path / "missing.db")
+
+    response = client.delete("/library/metadata/1")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Metadata row not found"
