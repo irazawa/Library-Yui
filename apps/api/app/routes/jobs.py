@@ -11,7 +11,7 @@ from app.downloader import (
     extract_thumbnail,
     is_downloads_enabled,
 )
-from app.jobs import create_job, get_job, list_jobs, update_job_status
+from app.jobs import create_job, delete_job, get_job, list_jobs, update_job_status
 from app.storage import VIDEO_DIR
 
 logger = logging.getLogger(__name__)
@@ -212,3 +212,21 @@ def complete_download_job(job_id: str) -> JobResponse:
         if updated is not None:
             return JobResponse(**updated)
     return JobResponse(**job)
+
+
+@router.delete(
+    "/jobs/{job_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["Jobs"],
+)
+def delete_download_job(job_id: str) -> None:
+    """Delete a job from the in-memory store (and its SQLite row, if any).
+
+    Returns 204 on success and 404 for unknown job ids. The SQLite ``jobs``
+    row is removed best-effort; any database failure is swallowed so the
+    in-memory removal still succeeds.
+    """
+
+    if not delete_job(job_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    return None

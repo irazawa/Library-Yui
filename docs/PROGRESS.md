@@ -406,3 +406,9 @@
 - Task: added `DELETE /library/metadata/{id}` in `apps/api/app/routes/library.py` with 204 on success and 404 for unknown/missing metadata. The endpoint deletes the SQLite metadata row, explicitly removes its `metadata_tags` join rows, and best-effort removes the uploaded file only when the stored path resolves inside `UPLOADS_DIR`. Added `database.delete_metadata()` so route code can atomically remove DB state while still returning the deleted row for file cleanup.
 - Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_library.py -q` — 39 passed.
 - Next small step: add a `DELETE /jobs/{id}` endpoint that removes a job from the in-memory store (and its SQLite row if persistence is wired).
+
+## 2026-07-21 SEAST — Slow Builder (jobs delete endpoint)
+
+- Task: added `DELETE /jobs/{id}` endpoint (`apps/api/app/routes/jobs.py`) returning 204 on success and 404 for unknown ids. The endpoint removes the job from the in-memory store (via a new `delete_job()` helper in `app/jobs.py`) and best-effort removes its SQLite `jobs` row via a new `_unpersist_job()` helper mirroring the existing `_persist_job()` — any DB error is swallowed so the in-memory removal always wins. A missing `jobs` table is treated as a quiet no-op rather than a warning. Added 3 new tests in `tests/test_jobs.py`: (1) delete returns 204, removes the job from the store and the list; (2) unknown id returns 404 with `detail="Job not found"`; (3) deleting a completed job also removes its persisted SQLite row.
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_jobs.py -q` — 37 passed (3 new). Full suite `pytest -q` — 157 passed (no regressions).
+- Next small step: extend `GET /library/uploads` to accept optional `?limit=` and `?offset=` query params (defaulting to no pagination) and include a `total` count field in the response.

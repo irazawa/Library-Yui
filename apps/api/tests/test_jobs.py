@@ -778,3 +778,65 @@ def test_job_persistence_swallows_db_error(monkeypatch, tmp_path) -> None:
         assert not (tmp_path / "library.db").is_file()
     finally:
         set_jobs_db_path(database.DEFAULT_DB_PATH)
+
+
+# ---------------------------------------------------------------------------
+# DELETE /jobs/{id}
+# ---------------------------------------------------------------------------
+
+def test_delete_job_returns_204_and_removes_from_store() -> None:
+    """DELETE /jobs/{id} returns 204 and removes the job from the store."""
+
+    client = TestClient(app)
+    created = client.post(
+        "/jobs",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"},
+    ).json()
+    job_id = created["id"]
+
+    response = client.delete(f"/jobs/{job_id}")
+
+    assert response.status_code == 204
+    # The job is gone from the in-memory store.
+    assert client.get(f"/jobs/{job_id}").status_code == 404
+    # The list no longer contains it.
+    items = client.get("/jobs").json()["items"]
+    assert all(item["id"] != job_id for item in items)
+
+
+def test_delete_job_unknown_id_returns_404() -> None:
+    """DELETE /jobs/{id} on an unknown id returns 404 with a clear detail."""
+
+    client = TestClient(app)
+
+    response = client.delete("/jobs/does-not-exist")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Job not found"
+
+
+def test_delete_job_after_complete_removes_persisted_row(tmp_path) -> None:
+    """Deleting a completed job should also remove its SQLite row."""
+
+    db_path = tmp_path / "library.db"
+    set_jobs_db_path(db_path)
+    try:
+        client = TestClient(app)
+        created = client.post(
+            "/jobs",
+            json={"url": "https://youtu.be/abcdefghijk"},
+        ).json()
+        job_id = created["id"]
+        client.post(f"/jobs/{job_id}/complete")
+
+        # Sanity: the row is there before deletion.
+        assert len(_read_job_rows(db_path)) == 1
+
+        delete_response = client.delete(f"/jobs/{job_id}")
+        assert delete_response.status_code == 204
+
+        # The SQLite row is removed.
+        rows = _read_job_rows(db_path)
+        assert all(row["id"] != job_id for row in rows)
+    finally:
+        set_jobs_db_path(database.DEFAULT_DB_PATH)

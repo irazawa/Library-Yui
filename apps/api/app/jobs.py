@@ -144,6 +144,48 @@ def update_job_status(job_id: str, new_status: str) -> JobRecord | None:
     return job
 
 
+def _unpersist_job(job_id: str) -> None:
+    """Best-effort removal of *job_id* from the SQLite ``jobs`` table.
+
+    Mirrors :func:`_persist_job`: any database error is logged and swallowed
+    so the in-memory store — the source of truth for the API — is never
+    affected. A missing ``jobs`` table (e.g. a fresh DB that never had a job
+    written) is treated as a no-op rather than an error.
+    """
+
+    try:
+        connection = get_connection(_jobs_db_path)
+        try:
+            connection.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+            connection.commit()
+        finally:
+            connection.close()
+    except sqlite3.Error as exc:
+        # A missing ``jobs`` table means there is nothing to delete; treat
+        # that case as a quiet no-op instead of a noisy warning.
+        if "no such table" in str(exc).lower():
+            return
+        logger.warning("Job unpersist failed for %s: %s", job_id, exc)
+    except Exception:  # pragma: no cover - defensive guard
+        logger.exception("Unexpected error unpersisting job %s", job_id)
+
+
+def delete_job(job_id: str) -> bool:
+    """Remove a job by id from the in-memory store.
+
+    Returns ``True`` when a job was removed, or ``False`` when the job did
+    not exist. The SQLite ``jobs`` row (if any) is removed best-effort via
+    :func:`_unpersist_job`; any database failure is swallowed so the
+    in-memory removal still succeeds.
+    """
+
+    existed = _JOBS.pop(job_id, None) is not None
+    _JOB_TIMESTAMPS.pop(job_id, None)
+    if existed:
+        _unpersist_job(job_id)
+    return existed
+
+
 def reset_jobs() -> None:
     """Clear all jobs. Intended for tests."""
 
