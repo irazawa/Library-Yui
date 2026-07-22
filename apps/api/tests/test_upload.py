@@ -237,7 +237,7 @@ def test_list_uploads_empty_when_no_database(monkeypatch, tmp_path):
     response = client.get("/library/uploads")
 
     assert response.status_code == 200
-    assert response.json() == {"items": []}
+    assert response.json() == {"items": [], "total": 0}
 
 
 def test_list_uploads_returns_recorded_uploads_newest_first(monkeypatch, tmp_path):
@@ -260,7 +260,9 @@ def test_list_uploads_returns_recorded_uploads_newest_first(monkeypatch, tmp_pat
     response = client.get("/library/uploads")
 
     assert response.status_code == 200
-    items = response.json()["items"]
+    body = response.json()
+    items = body["items"]
+    assert body["total"] == 2
     assert len(items) == 2
 
     # Newest first: second.mp3 then first.mp3.
@@ -401,3 +403,62 @@ def test_list_uploads_filter_combines_tag_and_q(monkeypatch, tmp_path):
     items2 = client.get("/library/uploads?tag=chill&q=rock").json()["items"]
     assert len(items2) == 1
     assert items2[0]["filename"] == "ChillRock.mp3"
+
+
+def test_list_uploads_limit_returns_first_page_and_total(monkeypatch, tmp_path):
+    """GET /library/uploads?limit= returns only the first page while total
+    still reports all matching rows."""
+
+    _setup_isolated_storage(monkeypatch, tmp_path)
+
+    for name in ["first.mp3", "second.mp3", "third.mp3"]:
+        client.post(
+            "/library/upload",
+            files={"file": (name, name.encode(), "audio/mpeg")},
+        )
+
+    response = client.get("/library/uploads?limit=2")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 3
+    assert [item["filename"] for item in body["items"]] == ["third.mp3", "second.mp3"]
+
+
+def test_list_uploads_offset_skips_newest_items(monkeypatch, tmp_path):
+    """GET /library/uploads?offset= skips rows from the newest-first list."""
+
+    _setup_isolated_storage(monkeypatch, tmp_path)
+
+    for name in ["first.mp3", "second.mp3", "third.mp3"]:
+        client.post(
+            "/library/upload",
+            files={"file": (name, name.encode(), "audio/mpeg")},
+        )
+
+    response = client.get("/library/uploads?offset=1")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 3
+    assert [item["filename"] for item in body["items"]] == ["second.mp3", "first.mp3"]
+
+
+def test_list_uploads_limit_and_offset_can_page_results(monkeypatch, tmp_path):
+    """GET /library/uploads?limit=&offset= returns a window into the matching
+    rows while keeping the unpaginated total."""
+
+    _setup_isolated_storage(monkeypatch, tmp_path)
+
+    for name in ["first.mp3", "second.mp3", "third.mp3", "fourth.mp3"]:
+        client.post(
+            "/library/upload",
+            files={"file": (name, name.encode(), "audio/mpeg")},
+        )
+
+    response = client.get("/library/uploads?limit=2&offset=1")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 4
+    assert [item["filename"] for item in body["items"]] == ["third.mp3", "second.mp3"]

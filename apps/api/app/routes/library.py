@@ -3,7 +3,7 @@ import sqlite3
 import struct
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, UploadFile, status
+from fastapi import APIRouter, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
@@ -63,6 +63,7 @@ class UploadResponse(BaseModel):
 
 class UploadListResponse(BaseModel):
     items: list[UploadResponse]
+    total: int
 
 
 class TagListResponse(BaseModel):
@@ -512,12 +513,18 @@ def upload_file(file: UploadFile) -> UploadResponse:
 
 
 @router.get("/library/uploads", response_model=UploadListResponse, tags=["Library"])
-def list_uploads(tag: str | None = None, q: str | None = None) -> UploadListResponse:
+def list_uploads(
+    tag: str | None = None,
+    q: str | None = None,
+    limit: int | None = Query(default=None, ge=0),
+    offset: int = Query(default=0, ge=0),
+) -> UploadListResponse:
     """Return uploaded items recorded in the SQLite database.
 
-    Items are returned newest-first. When the database file does not exist
-    yet, an empty list is returned so the endpoint works before any uploads
-    have happened.
+    Items are returned newest-first. The response always includes ``total``:
+    the number of rows matching the filters before pagination is applied. When
+    the database file does not exist yet, an empty list and ``total: 0`` are
+    returned so the endpoint works before any uploads have happened.
 
     Optional query params filter the results (combined with AND when both
     are provided):
@@ -525,11 +532,13 @@ def list_uploads(tag: str | None = None, q: str | None = None) -> UploadListResp
     - ``tag``: only items that have this tag name attached.
     - ``q``: only items whose ``filename`` contains the substring
       (case-insensitive).
+    - ``limit``: maximum number of matching items to return.
+    - ``offset``: number of matching items to skip before returning results.
     """
 
     db_file = Path(DB_PATH)
     if not db_file.is_file():
-        return UploadListResponse(items=[])
+        return UploadListResponse(items=[], total=0)
 
     try:
         rows = database.list_metadata_filtered(tag=tag, q=q, db_path=DB_PATH)
@@ -537,9 +546,18 @@ def list_uploads(tag: str | None = None, q: str | None = None) -> UploadListResp
         # A corrupt/unreadable database should not 500 the whole endpoint;
         # return an empty list and let the logs surface the issue.
         logger.exception("Failed to read uploads from %s", DB_PATH)
-        return UploadListResponse(items=[])
+        return UploadListResponse(items=[], total=0)
 
-    return UploadListResponse(items=[UploadResponse(**row) for row in rows])
+    total = len(rows)
+    if offset:
+        rows = rows[offset:]
+    if limit is not None:
+        rows = rows[:limit]
+
+    return UploadListResponse(
+        items=[UploadResponse(**row) for row in rows],
+        total=total,
+    )
 
 
 @router.get("/library/tags", response_model=TagListResponse, tags=["Collections"])

@@ -412,3 +412,9 @@
 - Task: added `DELETE /jobs/{id}` endpoint (`apps/api/app/routes/jobs.py`) returning 204 on success and 404 for unknown ids. The endpoint removes the job from the in-memory store (via a new `delete_job()` helper in `app/jobs.py`) and best-effort removes its SQLite `jobs` row via a new `_unpersist_job()` helper mirroring the existing `_persist_job()` — any DB error is swallowed so the in-memory removal always wins. A missing `jobs` table is treated as a quiet no-op rather than a warning. Added 3 new tests in `tests/test_jobs.py`: (1) delete returns 204, removes the job from the store and the list; (2) unknown id returns 404 with `detail="Job not found"`; (3) deleting a completed job also removes its persisted SQLite row.
 - Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_jobs.py -q` — 37 passed (3 new). Full suite `pytest -q` — 157 passed (no regressions).
 - Next small step: extend `GET /library/uploads` to accept optional `?limit=` and `?offset=` query params (defaulting to no pagination) and include a `total` count field in the response.
+
+## 2026-07-22 14:35 SEAST — Slow Builder (uploads pagination)
+
+- Task: extended `GET /library/uploads` with optional `?limit=` and `?offset=` query params and added a `total` field reporting the unpaginated filtered row count. Existing `tag`/`q` filtering still runs before pagination; missing/corrupt databases return `{"items": [], "total": 0}`.
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_upload.py -q` — 20 passed.
+- Next small step: add a `GET /config` System endpoint returning runtime config (`LIBRARY_YUI_DOWNLOADS_ENABLED`, `MAX_UPLOAD_BYTES`, resolved library dirs).
