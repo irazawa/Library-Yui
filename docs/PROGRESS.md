@@ -418,3 +418,9 @@
 - Task: extended `GET /library/uploads` with optional `?limit=` and `?offset=` query params and added a `total` field reporting the unpaginated filtered row count. Existing `tag`/`q` filtering still runs before pagination; missing/corrupt databases return `{"items": [], "total": 0}`.
 - Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_upload.py -q` — 20 passed.
 - Next small step: add a `GET /config` System endpoint returning runtime config (`LIBRARY_YUI_DOWNLOADS_ENABLED`, `MAX_UPLOAD_BYTES`, resolved library dirs).
+
+## 2026-07-22 15:02 SEAST — Slow Builder (runtime config endpoint)
+
+- Task: added `GET /config` in `apps/api/app/routes/health.py` returning non-secret runtime config: `downloads_enabled` from `LIBRARY_YUI_DOWNLOADS_ENABLED`, `max_upload_bytes`, and resolved library directories (`library`, `audio`, `video`, `uploads`, `thumbnails`). The endpoint is tagged `System` for OpenAPI grouping.
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_config.py -q` — 4 passed.
+- Next small step: add a per-upload tag-editing UI in the main web app Uploads card.
