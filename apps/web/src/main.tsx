@@ -261,6 +261,102 @@ function useLibraryUploads(refreshKey: number) {
   return { items, loading };
 }
 
+/**
+ * Per-upload tag editor: renders the metadata row's current tags as
+ * removable chips and a small input + "Add tag" button that calls
+ * `POST /library/metadata/{id}/tags`; removing a chip calls
+ * `DELETE /library/metadata/{id}/tags/{tag}`. Both responses return the
+ * full sorted tag list, which is bubbled up via `onTagsChange`.
+ */
+interface TagEditorProps {
+  metadataId: number;
+  tags: string[];
+  onTagsChange: (tags: string[]) => void;
+  onError: (msg: string) => void;
+}
+
+function TagEditor({ metadataId, tags, onTagsChange, onError }: TagEditorProps) {
+  const [value, setValue] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function handleAdd(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const tag = value.trim();
+    if (!tag || busy) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/library/metadata/${metadataId}/tags`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await res.json()) as { tags: string[] };
+      onTagsChange(data.tags);
+      setValue('');
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Add tag failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRemove(tag: string) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/library/metadata/${metadataId}/tags/${encodeURIComponent(tag)}`,
+        { method: 'DELETE' },
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await res.json()) as { tags: string[] };
+      onTagsChange(data.tags);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Remove tag failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="tag-editor">
+      {tags.length > 0 && (
+        <ul className="tag-chips">
+          {tags.map((tag) => (
+            <li key={tag} className="tag-chip">
+              <span className="tag-chip-name">{tag}</span>
+              <button
+                type="button"
+                className="tag-chip-remove"
+                disabled={busy}
+                onClick={() => handleRemove(tag)}
+                aria-label={`Remove tag ${tag}`}
+              >
+                ✕
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <form className="tag-form" onSubmit={handleAdd}>
+        <input
+          type="text"
+          className="tag-input"
+          placeholder="Add a tag…"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          disabled={busy}
+          aria-label={`Add tag to upload ${metadataId}`}
+        />
+        <button type="submit" className="tag-add" disabled={busy || value.trim() === ''}>
+          {busy ? '…' : 'Add tag'}
+        </button>
+      </form>
+    </div>
+  );
+}
+
 function App() {
   const { state, summary } = useLibrarySummary();
   const { items: audioItems, loading: audioLoading } = useLibraryAudio();
@@ -278,6 +374,36 @@ function App() {
   const [uploadsRefreshKey, setUploadsRefreshKey] = useState(0);
   const { items: uploadItems, loading: uploadsLoading } = useLibraryUploads(uploadsRefreshKey);
   const [uploadsFilter, setUploadsFilter] = useState('');
+  // Per-upload tags map (metadataId -> tag list). Lazily fetched for each
+  // upload item via `GET /library/metadata/{id}` once the uploads list is
+  // loaded; updated in place by the TagEditor's onTagsChange callback.
+  const [uploadTags, setUploadTags] = useState<Record<number, string[]>>({});
+  useEffect(() => {
+    if (uploadItems.length === 0) return;
+    let cancelled = false;
+    Promise.all(
+      uploadItems.map(async (it) => {
+        try {
+          const res = await fetch(`${API_BASE_URL}/library/metadata/${it.id}`);
+          if (!res.ok) return null;
+          const data = (await res.json()) as { tags: string[] };
+          return [it.id, data.tags] as const;
+        } catch {
+          return null;
+        }
+      }),
+    ).then((results) => {
+      if (cancelled) return;
+      const next: Record<number, string[]> = {};
+      for (const r of results) {
+        if (r) next[r[0]] = r[1];
+      }
+      setUploadTags(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [uploadItems]);
   // Global dismissible error banner. Surfacing already-caught local failures
   // (upload/download/poll) at the top of the page so the user always notices
   // them even when scrolled past the inline error notes.
@@ -561,6 +687,14 @@ function App() {
                         {' · '}
                         {formatUploadedAt(item.uploaded_at)}
                       </span>
+                      <TagEditor
+                        metadataId={item.id}
+                        tags={uploadTags[item.id] ?? []}
+                        onTagsChange={(tags) =>
+                          setUploadTags((prev) => ({ ...prev, [item.id]: tags }))
+                        }
+                        onError={(msg) => setNotice(`Tag edit failed: ${msg}`)}
+                      />
                     </li>
                   ))}
                 </ul>
