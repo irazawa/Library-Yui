@@ -73,6 +73,7 @@ interface UploadItem {
 
 interface UploadListResponse {
   items: UploadItem[];
+  total: number;
 }
 
 /**
@@ -230,24 +231,41 @@ function useLibraryVideo() {
  * Fetch the list of uploaded files via `GET /library/uploads`.
  * Pass a changing `refreshKey` (e.g. a counter bumped after a successful
  * upload) to force a re-fetch. Returns the list plus a loading flag.
+ *
+ * Supports incremental pagination: when `limit` is set, only `limit` items
+ * per page are fetched; calling `loadMore()` advances `offset` by `limit`
+ * and appends the next page. `hasMore` is true when the server reports a
+ * `total` larger than the items currently held. When `limit` is null the
+ * full list is fetched in one shot (legacy behaviour).
  */
+const UPLOADS_PAGE_SIZE = 10;
+
 function useLibraryUploads(refreshKey: number) {
   const [items, setItems] = useState<UploadItem[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [offset, setOffset] = useState(0);
 
+  // Initial / refresh fetch: load the first page (or the whole list when
+  // the server has fewer items than one page).
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetch(UPLOADS_URL)
+    setOffset(0);
+    const params = new URLSearchParams({ limit: String(UPLOADS_PAGE_SIZE), offset: '0' });
+    fetch(`${UPLOADS_URL}?${params.toString()}`)
       .then(async (res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = (await res.json()) as UploadListResponse;
         if (cancelled) return;
         setItems(data.items);
+        setTotal(data.total);
       })
       .catch(() => {
         if (cancelled) return;
         setItems([]);
+        setTotal(0);
       })
       .finally(() => {
         if (cancelled) return;
@@ -258,7 +276,33 @@ function useLibraryUploads(refreshKey: number) {
     };
   }, [refreshKey]);
 
-  return { items, loading };
+  const hasMore = items.length < total;
+
+  function loadMore() {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    const nextOffset = offset + UPLOADS_PAGE_SIZE;
+    const params = new URLSearchParams({
+      limit: String(UPLOADS_PAGE_SIZE),
+      offset: String(nextOffset),
+    });
+    fetch(`${UPLOADS_URL}?${params.toString()}`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = (await res.json()) as UploadListResponse;
+        setItems((prev) => [...prev, ...data.items]);
+        setTotal(data.total);
+        setOffset(nextOffset);
+      })
+      .catch(() => {
+        // Best-effort: leave the already-loaded items in place.
+      })
+      .finally(() => {
+        setLoadingMore(false);
+      });
+  }
+
+  return { items, total, loading, loadingMore, hasMore, loadMore };
 }
 
 /**
@@ -372,7 +416,14 @@ function App() {
   const [uploadNote, setUploadNote] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadsRefreshKey, setUploadsRefreshKey] = useState(0);
-  const { items: uploadItems, loading: uploadsLoading } = useLibraryUploads(uploadsRefreshKey);
+  const {
+    items: uploadItems,
+    total: uploadTotal,
+    loading: uploadsLoading,
+    loadingMore: uploadsLoadingMore,
+    hasMore: uploadsHasMore,
+    loadMore: uploadsLoadMore,
+  } = useLibraryUploads(uploadsRefreshKey);
   const [uploadsFilter, setUploadsFilter] = useState('');
   // Per-upload tags map (metadataId -> tag list). Lazily fetched for each
   // upload item via `GET /library/metadata/{id}` once the uploads list is
@@ -698,6 +749,24 @@ function App() {
                     </li>
                   ))}
                 </ul>
+              )}
+              {/* "Load more" pagination control. Only meaningful when no
+                  client-side filename filter is active (the filter applies
+                  over the already-loaded page, not the full backend set). */}
+              {filterNeedle === '' && uploadsHasMore && (
+                <div className="uploads-pagination">
+                  <span className="uploads-count">
+                    {uploadItems.length} of {uploadTotal}
+                  </span>
+                  <button
+                    type="button"
+                    className="uploads-load-more"
+                    onClick={uploadsLoadMore}
+                    disabled={uploadsLoadingMore}
+                  >
+                    {uploadsLoadingMore ? 'Loading…' : 'Load more'}
+                  </button>
+                </div>
               )}
             </>
           )}
