@@ -124,3 +124,23 @@ flag-gated downloads).
 - [x] Add a per-upload tag-editing UI in the main web app Uploads card (`apps/web/src/main.tsx` + `styles.css`): a small input + "Add tag" button per item calling `POST /library/metadata/{id}/tags` and rendering removable tag chips via `DELETE /library/metadata/{id}/tags/{tag}`; verify with `npm run build` in `apps/web`.
 - [x] Add a "Load more" pagination control to the main web app Uploads list (`apps/web/src/main.tsx`) that fetches the next page via `?limit=&offset=` on `GET /library/uploads` when more items are available; verify with `npm run build` in `apps/web`.
 - [x] Update `docs/API.md` documenting the new `DELETE /library/metadata/{id}`, `DELETE /jobs/{id}`, `GET /config` endpoints and the `?limit=`/`?offset=`/`total` pagination fields on `GET /library/uploads`; verify with `git diff --check`.
+
+## Next batch (generated 2026-07-24 via Gemini 3.5 Flash)
+
+MVP 5 (Persistence) completion plus MVP 3 (Collections) expansion and
+frontend polish. Each task is small, self-contained, and verifiable with
+a single `pytest` run (backend), `npm run build` (frontend), or
+`git diff --check` (docs). Adapted to Library-Yui conventions (SQLite
+`metadata`/`tags`/`metadata_tags`/`jobs` schema in
+`apps/api/app/database.py`, in-memory job store in `app/jobs.py` with
+dual-write persistence, filesystem-based `library/` storage,
+`app/downloader.py` flag-gated downloads).
+
+- [ ] Update `docs/ROADMAP.md` to check off the completed MVP 0-4 milestone line items (project shell, audio downloads, uploads, collections/tags/search, video library/preview/thumbnails) — docs-only; verify with `git diff --check`.
+- [ ] Add a `load_jobs_from_db(db_path)` helper in `apps/api/app/jobs.py` that reads all rows from the SQLite `jobs` table and hydrates the in-memory `_JOBS` store plus `_JOB_TIMESTAMPS` side-table (best-effort, swallows missing-table/DB errors); add tests in `tests/test_jobs.py` verifying a DB-seeded job appears in `list_jobs()` with correct fields and timestamps.
+- [ ] Wire `load_jobs_from_db()` into backend startup (`apps/api/main.py` lifespan/startup event) so persisted jobs reappear in the in-memory store after a process restart; add a startup integration test in `tests/test_jobs.py` (or `tests/test_health.py`) verifying the store is hydrated from a pre-seeded tmp DB before the first request.
+- [ ] Record a `metadata` row for successfully downloaded audio (in `_maybe_run_download` / `POST /jobs/{id}/start` flag-gated path) using the produced file's filename/absolute path/size and `content_type="audio/mpeg"`; add tests in `tests/test_jobs.py` asserting a metadata row exists in the DB after a completed audio download.
+- [ ] Add `POST /collections` (body `{name}`, 201, rejects duplicate names with 409/422) and `GET /collections` (200 list) endpoints backed by a new `collections` table (`id`, `name UNIQUE`) added to `init_db()` in `apps/api/app/database.py`; add schema + endpoint tests in `tests/test_database.py` and `tests/test_library.py`.
+- [ ] Add `POST /collections/{name}/items` (body `{metadata_id}`) and `DELETE /collections/{name}/items/{metadata_id}` endpoints plus a `GET /collections/{name}/items` list, backed by a new `collection_items` join table (`collection_id`, `metadata_id`) added to `init_db()`; add tests in `tests/test_library.py` covering add/list/remove and 404 for unknown collections.
+- [ ] Add a persistent bottom-docked audio player bar to the main web app (`apps/web/src/main.tsx` + `styles.css`) that plays the currently selected audio item via `GET /library/audio/{name}` and shows title + play/pause; verify with `npm run build` in `apps/web`.
+- [ ] Add a tag-based quick-filter dropdown to the main web app Uploads card (`apps/web/src/main.tsx`) that fetches `GET /library/tags` once on mount and lets the user pick a tag to filter the uploads list via `?tag=` on `GET /library/uploads`; verify with `npm run build` in `apps/web`.
