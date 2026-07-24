@@ -186,6 +186,68 @@ def delete_job(job_id: str) -> bool:
     return existed
 
 
+def load_jobs_from_db(db_path: object | None = None) -> int:
+    """Hydrate the in-memory job store from the SQLite ``jobs`` table.
+
+    Reads every row from the ``jobs`` table at *db_path* (defaulting to the
+    configured :data:`_jobs_db_path`) and repopulates :data:`_JOBS` plus the
+    :data:`_JOB_TIMESTAMPS` side-table, so jobs persisted before a process
+    restart reappear in :func:`list_jobs` with their original id, url, mode,
+    status, and ISO-8601 timestamps. Rows are loaded in ``created_at`` order
+    so the in-memory insertion order reflects creation order.
+
+    Best-effort: any database error (missing file, missing ``jobs`` table,
+    unreadable row) is logged and swallowed, leaving the in-memory store
+    untouched. A missing ``jobs`` table (e.g. a fresh DB that never had a
+    job written) is treated as a quiet no-op. Returns the number of rows
+    successfully loaded.
+    """
+
+    resolved_path = _jobs_db_path if db_path is None else db_path
+
+    try:
+        connection = get_connection(resolved_path)
+        try:
+            rows = connection.execute(
+                "SELECT id, url, mode, status, created_at, updated_at "
+                "FROM jobs ORDER BY created_at ASC"
+            ).fetchall()
+        finally:
+            connection.close()
+    except sqlite3.Error as exc:
+        # A missing ``jobs`` table means there is nothing to load; treat
+        # that case as a quiet no-op instead of a noisy warning, mirroring
+        # :func:`_unpersist_job`.
+        if "no such table" in str(exc).lower():
+            return 0
+        logger.warning("Job load_from_db failed: %s", exc)
+        return 0
+    except Exception:  # pragma: no cover - defensive guard
+        logger.exception("Unexpected error loading jobs from DB")
+        return 0
+
+    loaded = 0
+    for row in rows:
+        try:
+            job_id = row["id"]
+            _JOBS[job_id] = {
+                "id": job_id,
+                "url": row["url"],
+                "status": row["status"],
+                "mode": row["mode"],
+            }
+            _JOB_TIMESTAMPS[job_id] = {
+                "created_at": row["created_at"],
+                "updated_at": row["updated_at"],
+            }
+            loaded += 1
+        except (KeyError, TypeError, IndexError):
+            logger.warning(
+                "Skipping malformed job row during hydration: %r", dict(row)
+            )
+    return loaded
+
+
 def reset_jobs() -> None:
     """Clear all jobs. Intended for tests."""
 

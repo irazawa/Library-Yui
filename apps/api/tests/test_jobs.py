@@ -840,3 +840,127 @@ def test_delete_job_after_complete_removes_persisted_row(tmp_path) -> None:
         assert all(row["id"] != job_id for row in rows)
     finally:
         set_jobs_db_path(database.DEFAULT_DB_PATH)
+
+
+# ---------------------------------------------------------------------------
+# load_jobs_from_db() hydration
+# ---------------------------------------------------------------------------
+
+def test_load_jobs_from_db_hydrates_in_memory_store(tmp_path) -> None:
+    """A DB-seeded job appears in ``list_jobs()`` with correct fields and
+    timestamps after calling :func:`load_jobs_from_db`."""
+
+    from app.jobs import load_jobs_from_db
+
+    db_path = tmp_path / "library.db"
+    # Seed the database first via the dual-write path.
+    set_jobs_db_path(db_path)
+    try:
+        client = TestClient(app)
+        created = client.post(
+            "/jobs",
+            json={
+                "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                "mode": "audio",
+            },
+        ).json()
+        job_id = created["id"]
+
+        # Capture the persisted timestamps for later comparison.
+        persisted = _read_job_rows(db_path)[0]
+        created_at = persisted["created_at"]
+        updated_at = persisted["updated_at"]
+
+        # Simulate a process restart by clearing the in-memory store.
+        reset_jobs()
+        assert list_jobs_mod_list() == []
+
+        # Hydrate from the DB.
+        loaded = load_jobs_from_db(db_path)
+        assert loaded == 1
+
+        # The job reappears with its original fields and timestamps.
+        items = list_jobs_mod_list()
+        assert len(items) == 1
+        job = items[0]
+        assert job["id"] == job_id
+        assert job["url"] == "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        assert job["status"] == "pending"
+        assert job["mode"] == "audio"
+
+        # Timestamps side-table is repopulated with the persisted values.
+        from app import jobs as jobs_module
+
+        ts = jobs_module._JOB_TIMESTAMPS[job_id]
+        assert ts["created_at"] == created_at
+        assert ts["updated_at"] == updated_at
+    finally:
+        set_jobs_db_path(database.DEFAULT_DB_PATH)
+
+
+def test_load_jobs_from_db_preserves_insertion_order(tmp_path) -> None:
+    """Multiple DB-seeded jobs are hydrated in ``created_at`` order, matching
+    the original creation order."""
+
+    from app.jobs import load_jobs_from_db
+
+    db_path = tmp_path / "library.db"
+    set_jobs_db_path(db_path)
+    try:
+        client = TestClient(app)
+        first = client.post(
+            "/jobs", json={"url": "https://youtu.be/aaaaaaaaaaa"}
+        ).json()
+        second = client.post(
+            "/jobs", json={"url": "https://youtu.be/bbbbbbbbbbb"}
+        ).json()
+
+        reset_jobs()
+        loaded = load_jobs_from_db(db_path)
+        assert loaded == 2
+
+        items = list_jobs_mod_list()
+        assert [j["id"] for j in items] == [first["id"], second["id"]]
+    finally:
+        set_jobs_db_path(database.DEFAULT_DB_PATH)
+
+
+def test_load_jobs_from_db_returns_zero_when_no_table(tmp_path) -> None:
+    """Loading from a database file that has no ``jobs`` table is a quiet
+    no-op returning 0 (not an error)."""
+
+    from app.jobs import load_jobs_from_db
+
+    db_path = tmp_path / "library.db"
+    # Create the file but only the metadata table (no jobs table).
+    database.init_db(db_path)
+    # Drop the jobs table to simulate a pre-jobs-era database.
+    conn = sqlite3.connect(str(db_path))
+    try:
+        conn.execute("DROP TABLE IF EXISTS jobs")
+        conn.commit()
+    finally:
+        conn.close()
+
+    loaded = load_jobs_from_db(db_path)
+    assert loaded == 0
+    assert list_jobs_mod_list() == []
+
+
+def test_load_jobs_from_db_returns_zero_when_db_missing(tmp_path) -> None:
+    """Loading from a non-existent database file returns 0 and leaves the
+    in-memory store untouched."""
+
+    from app.jobs import load_jobs_from_db
+
+    missing = tmp_path / "does-not-exist.db"
+    loaded = load_jobs_from_db(missing)
+    assert loaded == 0
+
+
+# Convenience wrapper so tests don't have to import the module function each
+# time. Kept tiny to avoid touching the existing import block.
+def list_jobs_mod_list():
+    from app.jobs import list_jobs
+
+    return list_jobs()

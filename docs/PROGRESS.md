@@ -454,3 +454,9 @@
 - Task: updated `docs/ROADMAP.md` to check off all completed MVP 1-4 milestone line items (audio downloads, uploads, collections/tags/search, video library/preview/thumbnails). MVP 0 was already checked; this aligns the roadmap with the actual completed work recorded across PROGRESS.md (POST /jobs + downloads + persistence, POST /library/upload + tags + filters + search + pagination, GET /library/video + streaming + thumbnails + preview). Docs-only change — no code touched.
 - Verification: docs-only task — `git diff --check` clean (exit 0).
 - Next small step: add a `load_jobs_from_db(db_path)` helper in `apps/api/app/jobs.py` that hydrates the in-memory job store from the SQLite `jobs` table.
+
+## 2026-07-25 SEAST — Slow Builder (load_jobs_from_db hydration helper)
+
+- Task: added `load_jobs_from_db(db_path=None)` to `apps/api/app/jobs.py` — reads every row from the SQLite `jobs` table and repopulates the in-memory `_JOBS` store plus the `_JOB_TIMESTAMPS` side-table, so jobs persisted before a process restart reappear in `list_jobs()` with their original id/url/mode/status and ISO-8601 timestamps. Rows are loaded in `created_at` order to preserve creation-order in `list_jobs()`. Best-effort: a missing `jobs` table is a quiet no-op (mirrors `_unpersist_job`); any other `sqlite3.Error` is logged and swallowed leaving the in-memory store untouched; malformed individual rows are skipped. Returns the count of rows loaded.
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_jobs.py -q` — 41 passed (4 new). Full suite `pytest -q` — 167 passed (was 150-related, no regressions). `git status` shows only `apps/api/app/jobs.py` + `tests/test_jobs.py` modified; `.db` files are gitignored.
+- Next small step: wire `load_jobs_from_db()` into backend startup (`apps/api/main.py` lifespan/startup event) so persisted jobs reappear in the in-memory store after a process restart.
