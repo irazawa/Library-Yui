@@ -14,23 +14,23 @@ Build a personal YouTube-like library for private music/video collection managem
 - [x] Add roadmap and progress docs
 
 ### MVP 1 — Audio Downloads
-- [ ] Create download job API
-- [ ] Wire URL form in main web app
-- [ ] Save MP3 files into `library/audio/`
-- [ ] Show download job status
-- [ ] Show downloaded audio list
+- [x] Create download job API
+- [x] Wire URL form in main web app
+- [x] Save MP3 files into `library/audio/`
+- [x] Show download job status
+- [x] Show downloaded audio list
 
 ### MVP 2 — Uploads
-- [ ] Add upload API for audio/video files
-- [ ] Store uploaded file metadata
-- [ ] Show uploaded items in library
+- [x] Add upload API for audio/video files
+- [x] Store uploaded file metadata
+- [x] Show uploaded items in library
 
 ### MVP 3 — Collections
-- [ ] Add tags and collections
-- [ ] Add filters/search
-- [ ] Add edit metadata screen
+- [x] Add tags and collections
+- [x] Add filters/search
+- [x] Add edit metadata screen
 
 ### MVP 4 — Video Library
-- [ ] Add MP4 download mode
-- [ ] Add browser preview for video
-- [ ] Add thumbnails
+- [x] Add MP4 download mode
+- [x] Add browser preview for video
+- [x] Add thumbnails

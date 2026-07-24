@@ -448,3 +448,9 @@
 - Task: all previous slow-tasks were complete; generated the next batch of 8 tiny tasks via Gemini 3.5 Flash (`agy --model "Gemini 3.5 Flash (High)" --print`), targeting MVP 5 (Persistence) completion (`load_jobs_from_db` + startup hydration), downloaded-item metadata rows, MVP 3 (Collections) expansion (`collections` + `collection_items` tables and CRUD endpoints), and frontend polish (persistent audio player bar, tag quick-filter dropdown). Also included a docs task to check off the completed MVP 0-4 milestones in `ROADMAP.md`. Tasks were adapted to Library-Yui's actual schema (`metadata`/`tags`/`metadata_tags`/`jobs` tables in `apps/api/app/database.py`), in-memory job store with dual-write persistence (`app/jobs.py`), filesystem-based `library/` storage, and `app/downloader.py` flag-gated downloads before merging into `docs/plans/slow-tasks.md`. No implementation done this run per cron rule (plan update only).
 - Verification: docs-only plan update — `git diff --check` clean.
 - Next small step: update `docs/ROADMAP.md` to check off the completed MVP 0-4 milestone line items (docs-only).
+
+## 2026-07-25 SEAST — Slow Builder (ROADMAP MVP 0-4 checkoff)
+
+- Task: updated `docs/ROADMAP.md` to check off all completed MVP 1-4 milestone line items (audio downloads, uploads, collections/tags/search, video library/preview/thumbnails). MVP 0 was already checked; this aligns the roadmap with the actual completed work recorded across PROGRESS.md (POST /jobs + downloads + persistence, POST /library/upload + tags + filters + search + pagination, GET /library/video + streaming + thumbnails + preview). Docs-only change — no code touched.
+- Verification: docs-only task — `git diff --check` clean (exit 0).
+- Next small step: add a `load_jobs_from_db(db_path)` helper in `apps/api/app/jobs.py` that hydrates the in-memory job store from the SQLite `jobs` table.
