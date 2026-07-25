@@ -958,6 +958,39 @@ def test_load_jobs_from_db_returns_zero_when_db_missing(tmp_path) -> None:
     assert loaded == 0
 
 
+def test_startup_hydrates_jobs_from_preseeded_db(tmp_path) -> None:
+    """The FastAPI lifespan hydrates the in-memory store from a pre-seeded
+    SQLite database before the first request (simulated process restart)."""
+
+    db_path = tmp_path / "library.db"
+    set_jobs_db_path(db_path)
+    try:
+        # Seed the DB via the dual-write path, then simulate a restart by
+        # clearing the in-memory store.
+        with TestClient(app) as client:
+            created = client.post(
+                "/jobs",
+                json={
+                    "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                    "mode": "video",
+                },
+            ).json()
+        job_id = created["id"]
+        reset_jobs()
+        assert list_jobs_mod_list() == []
+
+        # Entering the TestClient context runs the lifespan startup, which
+        # must hydrate the store before the first request is served.
+        with TestClient(app) as client:
+            listed = client.get("/jobs").json()["items"]
+        assert [j["id"] for j in listed] == [job_id]
+        assert listed[0]["url"] == "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        assert listed[0]["status"] == "pending"
+        assert listed[0]["mode"] == "video"
+    finally:
+        set_jobs_db_path(database.DEFAULT_DB_PATH)
+
+
 # Convenience wrapper so tests don't have to import the module function each
 # time. Kept tiny to avoid touching the existing import block.
 def list_jobs_mod_list():
