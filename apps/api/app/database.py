@@ -63,6 +63,10 @@ def init_db(db_path: Path | str = DEFAULT_DB_PATH) -> None:
         - ``tag_id``: references ``tags.id``.
         - Primary key on ``(metadata_id, tag_id)`` keeps assignments unique.
 
+    ``collections`` table (MVP 3):
+        - ``id``: auto-increment primary key.
+        - ``name``: unique collection name.
+
     ``jobs`` table (persistence / MVP 5, schema-only for now):
         - ``id``: TEXT primary key (the job UUID).
         - ``url``: the source YouTube URL.
@@ -104,6 +108,14 @@ def init_db(db_path: Path | str = DEFAULT_DB_PATH) -> None:
                 metadata_id INTEGER NOT NULL REFERENCES metadata(id) ON DELETE CASCADE,
                 tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
                 PRIMARY KEY (metadata_id, tag_id)
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS collections (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE
             )
             """
         )
@@ -372,6 +384,46 @@ def list_metadata_filtered(
             "SELECT id, filename, path, size, content_type, uploaded_at "
             f"FROM metadata{where_clause} ORDER BY id DESC",
             params,
+        ).fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        connection.close()
+
+
+def create_collection(
+    name: str,
+    db_path: Path | str = DEFAULT_DB_PATH,
+) -> dict:
+    """Create a collection with the given unique *name*.
+
+    Returns the new row as ``{"id": ..., "name": ...}``. Raises
+    :class:`ValueError` for a blank name and lets
+    :class:`sqlite3.IntegrityError` propagate for duplicate names so the
+    caller can map it to an HTTP 409.
+    """
+
+    cleaned = name.strip()
+    if not cleaned:
+        raise ValueError("collection name must be a non-empty string")
+
+    connection = get_connection(db_path)
+    try:
+        cursor = connection.execute(
+            "INSERT INTO collections (name) VALUES (?)", (cleaned,)
+        )
+        connection.commit()
+        return {"id": int(cursor.lastrowid), "name": cleaned}
+    finally:
+        connection.close()
+
+
+def list_collections(db_path: Path | str = DEFAULT_DB_PATH) -> list[dict]:
+    """Return all collections as ``{"id", "name"}`` dicts, alphabetical."""
+
+    connection = get_connection(db_path)
+    try:
+        rows = connection.execute(
+            "SELECT id, name FROM collections ORDER BY name"
         ).fetchall()
         return [dict(row) for row in rows]
     finally:

@@ -611,3 +611,116 @@ def test_init_db_migrates_existing_pre_jobs_database(tmp_path):
     rows = database.list_metadata(db_path=db_path)
     assert len(rows) == 1
     assert rows[0]["filename"] == "old.mp3"
+
+
+# ---------------------------------------------------------------------------
+# collections table (MVP 3)
+# ---------------------------------------------------------------------------
+
+
+def test_init_db_creates_collections_table(tmp_path):
+    db_path = tmp_path / "library.db"
+
+    database.init_db(db_path=db_path)
+
+    tables = _table_names(db_path)
+    assert "collections" in tables
+
+
+def test_collections_table_has_expected_columns(tmp_path):
+    db_path = tmp_path / "library.db"
+
+    database.init_db(db_path=db_path)
+
+    connection = sqlite3.connect(str(db_path))
+    try:
+        columns = {row[1] for row in connection.execute("PRAGMA table_info(collections)")}
+    finally:
+        connection.close()
+
+    assert columns == {"id", "name"}
+
+
+def test_create_collection_returns_row_and_persists(tmp_path):
+    db_path = tmp_path / "library.db"
+    database.init_db(db_path=db_path)
+
+    row = database.create_collection("Favorites", db_path=db_path)
+
+    assert row["name"] == "Favorites"
+    assert isinstance(row["id"], int)
+    assert database.list_collections(db_path=db_path) == [row]
+
+
+def test_create_collection_rejects_duplicate_name(tmp_path):
+    db_path = tmp_path / "library.db"
+    database.init_db(db_path=db_path)
+    database.create_collection("Favorites", db_path=db_path)
+
+    try:
+        database.create_collection("Favorites", db_path=db_path)
+        duplicated = True
+    except sqlite3.IntegrityError:
+        duplicated = False
+
+    assert duplicated is False
+
+
+def test_create_collection_rejects_blank_name(tmp_path):
+    db_path = tmp_path / "library.db"
+    database.init_db(db_path=db_path)
+
+    try:
+        database.create_collection("   ", db_path=db_path)
+        accepted = True
+    except ValueError:
+        accepted = False
+
+    assert accepted is False
+
+
+def test_list_collections_sorted_alphabetically(tmp_path):
+    db_path = tmp_path / "library.db"
+    database.init_db(db_path=db_path)
+    database.create_collection("zeta", db_path=db_path)
+    database.create_collection("alpha", db_path=db_path)
+
+    names = [row["name"] for row in database.list_collections(db_path=db_path)]
+
+    assert names == ["alpha", "zeta"]
+
+
+def test_init_db_migrates_existing_pre_collections_database(tmp_path):
+    """init_db on a pre-collections database adds the collections table
+    without losing existing rows."""
+    db_path = tmp_path / "library.db"
+
+    connection = sqlite3.connect(str(db_path))
+    try:
+        connection.execute(
+            """
+            CREATE TABLE metadata (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                filename TEXT NOT NULL,
+                path TEXT NOT NULL,
+                size INTEGER NOT NULL,
+                content_type TEXT,
+                uploaded_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            "INSERT INTO metadata (filename, path, size, uploaded_at) "
+            "VALUES ('old.mp3', 'p', 1, '2026-01-01T00:00:00+00:00')"
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    database.init_db(db_path=db_path)
+
+    tables = _table_names(db_path)
+    assert "collections" in tables
+    rows = database.list_metadata(db_path=db_path)
+    assert len(rows) == 1
+    assert rows[0]["filename"] == "old.mp3"

@@ -785,3 +785,60 @@ def test_delete_metadata_missing_db_returns_404(monkeypatch, tmp_path):
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Metadata row not found"
+
+
+def test_create_collection_returns_201_with_row(monkeypatch, tmp_path):
+    db_path = tmp_path / "library.db"
+    monkeypatch.setattr(library_route, "DB_PATH", db_path)
+
+    response = client.post("/collections", json={"name": "Favorites"})
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["name"] == "Favorites"
+    assert isinstance(body["id"], int)
+
+
+def test_create_collection_duplicate_name_returns_409(monkeypatch, tmp_path):
+    db_path = tmp_path / "library.db"
+    monkeypatch.setattr(library_route, "DB_PATH", db_path)
+
+    first = client.post("/collections", json={"name": "Favorites"})
+    assert first.status_code == 201
+
+    duplicate = client.post("/collections", json={"name": "Favorites"})
+
+    assert duplicate.status_code == 409
+    assert duplicate.json()["detail"] == "A collection with that name already exists"
+
+
+def test_create_collection_blank_name_returns_422(monkeypatch, tmp_path):
+    db_path = tmp_path / "library.db"
+    monkeypatch.setattr(library_route, "DB_PATH", db_path)
+
+    response = client.post("/collections", json={"name": "   "})
+
+    assert response.status_code == 422
+
+
+def test_list_collections_returns_empty_when_no_db(monkeypatch, tmp_path):
+    monkeypatch.setattr(library_route, "DB_PATH", tmp_path / "missing.db")
+
+    response = client.get("/collections")
+
+    assert response.status_code == 200
+    assert response.json() == {"items": []}
+
+
+def test_list_collections_returns_created_collections_sorted(monkeypatch, tmp_path):
+    db_path = tmp_path / "library.db"
+    monkeypatch.setattr(library_route, "DB_PATH", db_path)
+
+    client.post("/collections", json={"name": "zeta"})
+    client.post("/collections", json={"name": "alpha"})
+
+    response = client.get("/collections")
+
+    assert response.status_code == 200
+    names = [item["name"] for item in response.json()["items"]]
+    assert names == ["alpha", "zeta"]

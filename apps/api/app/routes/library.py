@@ -83,6 +83,19 @@ class MetadataDetailResponse(UploadResponse):
     tags: list[str]
 
 
+class CollectionCreateRequest(BaseModel):
+    name: str
+
+
+class CollectionResponse(BaseModel):
+    id: int
+    name: str
+
+
+class CollectionListResponse(BaseModel):
+    items: list[CollectionResponse]
+
+
 def _count_files(directory: Path) -> int:
     """Count regular files directly inside a storage directory.
 
@@ -722,3 +735,57 @@ def remove_tag(metadata_id: int, tag: str) -> TagAssignResponse:
     database.remove_tag_from_metadata(metadata_id, tag, db_path=DB_PATH)
     tags = database.list_tags_for_metadata(metadata_id, DB_PATH)
     return TagAssignResponse(metadata_id=metadata_id, tags=tags)
+
+
+@router.post(
+    "/collections",
+    response_model=CollectionResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Collections"],
+)
+def create_collection(body: CollectionCreateRequest) -> CollectionResponse:
+    """Create a named collection.
+
+    Returns 201 with the new collection. Blank names are rejected with 422
+    and duplicate names with 409.
+    """
+
+    database.init_db(DB_PATH)
+    try:
+        row = database.create_collection(body.name, db_path=DB_PATH)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="collection name must be a non-empty string",
+        )
+    except sqlite3.IntegrityError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A collection with that name already exists",
+        )
+    return CollectionResponse(**row)
+
+
+@router.get(
+    "/collections",
+    response_model=CollectionListResponse,
+    tags=["Collections"],
+)
+def list_collections() -> CollectionListResponse:
+    """Return all collections in alphabetical order.
+
+    Returns ``{"items": []}`` when the database file does not exist yet, so
+    the endpoint works before any collections have been created.
+    """
+
+    db_file = Path(DB_PATH)
+    if not db_file.is_file():
+        return CollectionListResponse(items=[])
+
+    try:
+        rows = database.list_collections(DB_PATH)
+    except sqlite3.Error:
+        logger.exception("Failed to read collections from %s", DB_PATH)
+        return CollectionListResponse(items=[])
+
+    return CollectionListResponse(items=[CollectionResponse(**row) for row in rows])

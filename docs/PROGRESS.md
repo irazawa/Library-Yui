@@ -472,3 +472,9 @@
 - Task: record a `metadata` row for successfully downloaded audio in the flag-gated `POST /jobs/{id}/start` path — new `_maybe_record_audio_metadata()` helper in `apps/api/app/routes/jobs.py` picks the newest `.mp3` in `AUDIO_DIR`, inserts filename/absolute path/size with `content_type="audio/mpeg"` (idempotent by path, best-effort, never fails the job); added `METADATA_DB_PATH` test override plus an autouse isolation fixture and 3 new tests in `tests/test_jobs.py`.
 - Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest -q` — 171 passed.
 - Next small step: add `POST /collections` + `GET /collections` endpoints backed by a new `collections` table.
+## 2026-07-25 SEAST — Slow Builder (collections endpoints)
+
+- Task: added `POST /collections` (201, blank name → 422, duplicate name → 409) and `GET /collections` (alphabetical list, empty when DB missing) endpoints in `apps/api/app/routes/library.py`, backed by a new `collections` table (`id`, `name UNIQUE`) in `init_db()` plus `create_collection()` / `list_collections()` helpers in `app/database.py`. Added schema/migration tests in `tests/test_database.py` and endpoint tests in `tests/test_library.py`.
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_database.py tests/test_library.py -q` — 86 passed.
+- Next small step: add `POST /collections/{name}/items`, `DELETE /collections/{name}/items/{metadata_id}`, and `GET /collections/{name}/items` backed by a `collection_items` join table.
+
