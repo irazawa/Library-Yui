@@ -484,3 +484,9 @@
 - Task: added `POST /collections/{name}/items` (201, 404 for unknown collection/metadata, idempotent), `GET /collections/{name}/items` (newest first), and `DELETE /collections/{name}/items/{metadata_id}` (idempotent) endpoints in `apps/api/app/routes/library.py`, backed by a new `collection_items` join table in `init_db()` plus `get_collection_by_name()` / `add_item_to_collection()` / `remove_item_from_collection()` / `list_collection_items()` helpers in `app/database.py`. Added 7 endpoint tests in `tests/test_library.py`.
 - Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_library.py tests/test_database.py tests/test_health.py -q` — 93 passed.
 - Next small step: add a persistent bottom-docked audio player bar to the main web app.
+
+## 2026-07-26 06:34 SEAST — Slow Builder
+
+- Task: added a persistent bottom-docked audio player bar to the main web app (`AudioPlayerBar` in `apps/web/src/main.tsx` + `.player-bar` styles) — audio items in the Audio card now have a ▶ button that opens the bar, which streams via `GET /library/audio/{name}` with play/pause toggle, title, and close button (autoplay best-effort).
+- Verification: `cd apps/web && npm run build` — built successfully (tsc + vite), 15 modules transformed.
+- Next small step: add a tag-based quick-filter dropdown to the main web app Uploads card using `GET /library/tags` + `?tag=` filtering.

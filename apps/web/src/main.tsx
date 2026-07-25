@@ -42,6 +42,11 @@ function videoUrlFor(name: string): string {
   return `${LIBRARY_VIDEO_URL}/${encodeURIComponent(name)}`;
 }
 
+/** Build the per-file streaming URL for an audio item name. */
+function audioUrlFor(name: string): string {
+  return `${LIBRARY_AUDIO_URL}/${encodeURIComponent(name)}`;
+}
+
 /**
  * Build the best-effort thumbnail URL for a video item name.
  *
@@ -401,11 +406,78 @@ function TagEditor({ metadataId, tags, onTagsChange, onError }: TagEditorProps) 
   );
 }
 
+/**
+ * Persistent bottom-docked audio player bar. Plays the currently selected
+ * audio item via `GET /library/audio/{name}` with a play/pause toggle and
+ * a close button. Autoplays whenever the selected track changes.
+ */
+interface AudioPlayerBarProps {
+  track: AudioItem;
+  onClose: () => void;
+}
+
+function AudioPlayerBar({ track, onClose }: AudioPlayerBarProps) {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [playing, setPlaying] = useState(false);
+
+  // Load + autoplay whenever the selected track changes.
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    el.src = audioUrlFor(track.name);
+    el.play().catch(() => {
+      // Autoplay may be blocked by the browser — the user can press play.
+      setPlaying(false);
+    });
+  }, [track.name]);
+
+  function togglePlay() {
+    const el = audioRef.current;
+    if (!el) return;
+    if (el.paused) {
+      el.play().catch(() => setPlaying(false));
+    } else {
+      el.pause();
+    }
+  }
+
+  return (
+    <div className="player-bar" role="region" aria-label="Audio player">
+      <button
+        type="button"
+        className="player-toggle"
+        onClick={togglePlay}
+        aria-label={playing ? `Pause ${track.name}` : `Play ${track.name}`}
+      >
+        {playing ? '⏸' : '▶'}
+      </button>
+      <span className="player-title" title={track.name}>
+        {track.name}
+      </span>
+      <audio
+        ref={audioRef}
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onEnded={() => setPlaying(false)}
+      />
+      <button
+        type="button"
+        className="player-close"
+        onClick={onClose}
+        aria-label="Close audio player"
+      >
+        ✕
+      </button>
+    </div>
+  );
+}
+
 function App() {
   const { state, summary } = useLibrarySummary();
   const { items: audioItems, loading: audioLoading } = useLibraryAudio();
   const { items: videoItems, loading: videoLoading } = useLibraryVideo();
   const [activeVideo, setActiveVideo] = useState<VideoItem | null>(null);
+  const [activeAudio, setActiveAudio] = useState<AudioItem | null>(null);
   const [url, setUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -664,8 +736,16 @@ function App() {
           ) : (
             <ul className="audio-list">
               {audioItems.map((item) => (
-                <li key={item.name} className="audio-item">
-                  {item.name}
+                <li key={item.name} className="audio-item audio-item-playable">
+                  <button
+                    type="button"
+                    className="audio-play"
+                    onClick={() => setActiveAudio(item)}
+                    aria-label={`Play ${item.name}`}
+                  >
+                    ▶
+                  </button>
+                  <span className="audio-name">{item.name}</span>
                 </li>
               ))}
             </ul>
@@ -807,6 +887,7 @@ function App() {
           </div>
         </div>
       )}
+      {activeAudio && <AudioPlayerBar track={activeAudio} onClose={() => setActiveAudio(null)} />}
     </main>
   );
 }
