@@ -5,6 +5,8 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, HttpUrl
 
+from app import database
+from app.database import DEFAULT_DB_PATH
 from app.downloader import (
     download_mp3,
     download_mp4,
@@ -12,11 +14,17 @@ from app.downloader import (
     is_downloads_enabled,
 )
 from app.jobs import create_job, delete_job, get_job, list_jobs, update_job_status
-from app.storage import VIDEO_DIR
+from app.storage import AUDIO_DIR, VIDEO_DIR
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Database path used when recording metadata for completed audio downloads.
+# Tests override this via ``monkeypatch.setattr(jobs_routes,
+# "METADATA_DB_PATH", tmp_path / "test.db")`` to avoid touching the real
+# database file, mirroring ``DB_PATH`` in the library routes.
+METADATA_DB_PATH: Path | str = DEFAULT_DB_PATH
 
 
 class JobCreateRequest(BaseModel):
@@ -156,6 +164,11 @@ def _maybe_run_download(job_id: str) -> JobResponse | None:
         # flag-gated; this step must never fail the job.
         if mode == "video":
             _maybe_extract_thumbnails()
+        else:
+            # For a successful audio download, record a best-effort
+            # ``metadata`` row so the library knows about the new MP3.
+            # This step must never fail the job.
+            _maybe_record_audio_metadata()
     else:
         logger.warning(
             "Download returned non-zero exit code %s for job %s",
@@ -192,6 +205,54 @@ def _maybe_extract_thumbnails() -> None:
             extract_thumbnail(mp4)
     except Exception:  # pragma: no cover - defensive guard
         logger.exception("Thumbnail extraction raised; ignoring")
+
+
+def _maybe_record_audio_metadata() -> None:
+    """Record a ``metadata`` row for the most recently produced MP3 in
+    ``AUDIO_DIR``.
+
+    Runs after a successful ``mode == "audio"`` download. The yt-dlp output
+    template is ``<AUDIO_DIR>/%(title)s.%(ext)s`` and the downloader result
+    dict does not currently surface the produced file path, so we pick the
+    newest ``.mp3`` (by mtime) in the audio directory and insert its
+    filename, absolute path, and size with ``content_type="audio/mpeg"``.
+
+    Best-effort and idempotent: a row is only inserted when no existing
+    ``metadata`` row already references the same absolute path, and any
+    error is swallowed and logged so a metadata problem can never turn a
+    completed download into a failed one.
+    """
+
+    try:
+        audio_dir = Path(AUDIO_DIR)
+        if not audio_dir.is_dir():
+            return
+        mp3s = sorted(audio_dir.glob("*.mp3"), key=lambda p: p.stat().st_mtime)
+        if not mp3s:
+            return
+        produced = mp3s[-1]
+        resolved = str(produced.resolve())
+
+        database.init_db(METADATA_DB_PATH)
+        connection = database.get_connection(METADATA_DB_PATH)
+        try:
+            existing = connection.execute(
+                "SELECT 1 FROM metadata WHERE path = ?", (resolved,)
+            ).fetchone()
+        finally:
+            connection.close()
+        if existing is not None:
+            return
+
+        database.insert_metadata(
+            filename=produced.name,
+            path=resolved,
+            size=produced.stat().st_size,
+            content_type="audio/mpeg",
+            db_path=METADATA_DB_PATH,
+        )
+    except Exception:  # pragma: no cover - defensive guard
+        logger.exception("Recording audio download metadata raised; ignoring")
 
 
 @router.post("/jobs/{job_id}/complete", response_model=JobResponse, tags=["Jobs"])

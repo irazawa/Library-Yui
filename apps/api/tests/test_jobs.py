@@ -1,5 +1,7 @@
 from fastapi.testclient import TestClient
 
+import pytest
+
 from app import database
 from app import downloader as downloader_mod
 from app import jobs as jobs_mod
@@ -11,6 +13,23 @@ from main import app
 
 def setup_function() -> None:
     reset_jobs()
+
+
+@pytest.fixture(autouse=True)
+def _isolate_audio_metadata(monkeypatch, tmp_path):
+    """Keep the audio-metadata recording step away from the real library.
+
+    ``_maybe_record_audio_metadata`` scans ``AUDIO_DIR`` and writes into the
+    metadata database after a completed audio download. Redirect both to a
+    per-test tmp location so no test in this module touches the developer's
+    real ``library/audio`` folder or ``library.db``.
+    """
+
+    audio_dir = tmp_path / "audio"
+    audio_dir.mkdir()
+    monkeypatch.setattr(jobs_routes, "AUDIO_DIR", audio_dir)
+    monkeypatch.setattr(jobs_routes, "METADATA_DB_PATH", tmp_path / "metadata.db")
+    yield
 
 
 def test_create_job_returns_201_with_id_and_pending_status():
@@ -610,6 +629,122 @@ def test_start_job_video_mode_skips_thumbnail_when_video_dir_missing(monkeypatch
     assert response.status_code == 200
     assert response.json()["status"] == "completed"
     assert thumb_calls["count"] == 0
+
+
+def _read_metadata_rows(db_path) -> list[dict]:
+    import sqlite3 as _sqlite3
+
+    connection = _sqlite3.connect(str(db_path))
+    connection.row_factory = _sqlite3.Row
+    try:
+        rows = connection.execute(
+            "SELECT filename, path, size, content_type FROM metadata"
+        ).fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        connection.close()
+
+
+def test_start_job_audio_mode_records_metadata_row(monkeypatch, tmp_path):
+    """A completed audio download must record a ``metadata`` row with the
+    produced file's filename, absolute path, size, and ``audio/mpeg``."""
+
+    monkeypatch.setenv(DOWNLOADS_ENABLED_FLAG, "1")
+
+    audio_dir = tmp_path / "audio"
+    audio_dir.mkdir(exist_ok=True)
+    db_path = tmp_path / "metadata.db"
+    monkeypatch.setattr(jobs_routes, "AUDIO_DIR", audio_dir)
+    monkeypatch.setattr(jobs_routes, "METADATA_DB_PATH", db_path)
+
+    def fake_mp3(url, output_dir=None):
+        # Simulate yt-dlp producing an MP3 in the audio dir.
+        (audio_dir / "My Song.mp3").write_bytes(b"ID3 fake mp3 bytes")
+        return {"ok": True, "returncode": 0, "command": ["yt-dlp", url]}
+
+    monkeypatch.setattr(jobs_routes, "download_mp3", fake_mp3)
+
+    client = TestClient(app)
+    created = client.post(
+        "/jobs",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"},
+    ).json()
+
+    response = client.post(f"/jobs/{created['id']}/start")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "completed"
+
+    rows = _read_metadata_rows(db_path)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["filename"] == "My Song.mp3"
+    assert row["path"] == str((audio_dir / "My Song.mp3").resolve())
+    assert row["size"] == len(b"ID3 fake mp3 bytes")
+    assert row["content_type"] == "audio/mpeg"
+
+
+def test_start_job_audio_mode_metadata_recording_is_idempotent(monkeypatch, tmp_path):
+    """Downloading twice with the same produced file must not duplicate the
+    ``metadata`` row (matched by absolute path)."""
+
+    monkeypatch.setenv(DOWNLOADS_ENABLED_FLAG, "1")
+
+    audio_dir = tmp_path / "audio"
+    audio_dir.mkdir(exist_ok=True)
+    db_path = tmp_path / "metadata.db"
+    monkeypatch.setattr(jobs_routes, "AUDIO_DIR", audio_dir)
+    monkeypatch.setattr(jobs_routes, "METADATA_DB_PATH", db_path)
+
+    def fake_mp3(url, output_dir=None):
+        (audio_dir / "Same Song.mp3").write_bytes(b"bytes")
+        return {"ok": True, "returncode": 0, "command": ["yt-dlp", url]}
+
+    monkeypatch.setattr(jobs_routes, "download_mp3", fake_mp3)
+
+    client = TestClient(app)
+    for _ in range(2):
+        created = client.post(
+            "/jobs",
+            json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"},
+        ).json()
+        response = client.post(f"/jobs/{created['id']}/start")
+        assert response.json()["status"] == "completed"
+
+    assert len(_read_metadata_rows(db_path)) == 1
+
+
+def test_start_job_audio_mode_metadata_failure_does_not_fail_job(monkeypatch, tmp_path):
+    """If metadata recording raises, the job must still report ``completed``
+    — the metadata step is best-effort and never fails the job."""
+
+    monkeypatch.setenv(DOWNLOADS_ENABLED_FLAG, "1")
+
+    audio_dir = tmp_path / "audio"
+    audio_dir.mkdir(exist_ok=True)
+    (audio_dir / "Song.mp3").write_bytes(b"bytes")
+    monkeypatch.setattr(jobs_routes, "AUDIO_DIR", audio_dir)
+    monkeypatch.setattr(jobs_routes, "METADATA_DB_PATH", tmp_path / "metadata.db")
+
+    def fake_mp3(url, output_dir=None):
+        return {"ok": True, "returncode": 0, "command": ["yt-dlp", url]}
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("db exploded")
+
+    monkeypatch.setattr(jobs_routes, "download_mp3", fake_mp3)
+    monkeypatch.setattr(jobs_routes.database, "insert_metadata", boom)
+
+    client = TestClient(app)
+    created = client.post(
+        "/jobs",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"},
+    ).json()
+
+    response = client.post(f"/jobs/{created['id']}/start")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "completed"
 
 
 # ---------------------------------------------------------------------------

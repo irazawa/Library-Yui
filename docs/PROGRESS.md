@@ -466,3 +466,9 @@
 - Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests -q` — 168 passed.
 - Next small step: record a `metadata` row for successfully downloaded audio in the flag-gated `/jobs/{id}/start` path.
 
+
+## 2026-07-25 15:22 SEAST — Slow Builder
+
+- Task: record a `metadata` row for successfully downloaded audio in the flag-gated `POST /jobs/{id}/start` path — new `_maybe_record_audio_metadata()` helper in `apps/api/app/routes/jobs.py` picks the newest `.mp3` in `AUDIO_DIR`, inserts filename/absolute path/size with `content_type="audio/mpeg"` (idempotent by path, best-effort, never fails the job); added `METADATA_DB_PATH` test override plus an autouse isolation fixture and 3 new tests in `tests/test_jobs.py`.
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest -q` — 171 passed.
+- Next small step: add `POST /collections` + `GET /collections` endpoints backed by a new `collections` table.
