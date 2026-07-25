@@ -478,3 +478,9 @@
 - Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_database.py tests/test_library.py -q` — 86 passed.
 - Next small step: add `POST /collections/{name}/items`, `DELETE /collections/{name}/items/{metadata_id}`, and `GET /collections/{name}/items` backed by a `collection_items` join table.
 
+
+## 2026-07-26 01:31 SEAST — Slow Builder (collection items endpoints)
+
+- Task: added `POST /collections/{name}/items` (201, 404 for unknown collection/metadata, idempotent), `GET /collections/{name}/items` (newest first), and `DELETE /collections/{name}/items/{metadata_id}` (idempotent) endpoints in `apps/api/app/routes/library.py`, backed by a new `collection_items` join table in `init_db()` plus `get_collection_by_name()` / `add_item_to_collection()` / `remove_item_from_collection()` / `list_collection_items()` helpers in `app/database.py`. Added 7 endpoint tests in `tests/test_library.py`.
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_library.py tests/test_database.py tests/test_health.py -q` — 93 passed.
+- Next small step: add a persistent bottom-docked audio player bar to the main web app.

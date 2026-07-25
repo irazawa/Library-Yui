@@ -67,6 +67,12 @@ def init_db(db_path: Path | str = DEFAULT_DB_PATH) -> None:
         - ``id``: auto-increment primary key.
         - ``name``: unique collection name.
 
+    ``collection_items`` join table (MVP 3):
+        - ``collection_id``: references ``collections.id``.
+        - ``metadata_id``: references ``metadata.id``.
+        - Primary key on ``(collection_id, metadata_id)`` keeps memberships
+          unique.
+
     ``jobs`` table (persistence / MVP 5, schema-only for now):
         - ``id``: TEXT primary key (the job UUID).
         - ``url``: the source YouTube URL.
@@ -116,6 +122,15 @@ def init_db(db_path: Path | str = DEFAULT_DB_PATH) -> None:
             CREATE TABLE IF NOT EXISTS collections (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL UNIQUE
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS collection_items (
+                collection_id INTEGER NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+                metadata_id INTEGER NOT NULL REFERENCES metadata(id) ON DELETE CASCADE,
+                PRIMARY KEY (collection_id, metadata_id)
             )
             """
         )
@@ -424,6 +439,89 @@ def list_collections(db_path: Path | str = DEFAULT_DB_PATH) -> list[dict]:
     try:
         rows = connection.execute(
             "SELECT id, name FROM collections ORDER BY name"
+        ).fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        connection.close()
+
+
+def get_collection_by_name(
+    name: str,
+    db_path: Path | str = DEFAULT_DB_PATH,
+) -> dict | None:
+    """Return the collection row ``{"id", "name"}`` for *name*, or ``None``."""
+
+    connection = get_connection(db_path)
+    try:
+        row = connection.execute(
+            "SELECT id, name FROM collections WHERE name = ?", (name,)
+        ).fetchone()
+        return dict(row) if row is not None else None
+    finally:
+        connection.close()
+
+
+def add_item_to_collection(
+    collection_id: int,
+    metadata_id: int,
+    db_path: Path | str = DEFAULT_DB_PATH,
+) -> None:
+    """Add metadata row *metadata_id* to collection *collection_id*.
+
+    Idempotent: adding an item that is already in the collection is a
+    silent no-op.
+    """
+
+    connection = get_connection(db_path)
+    try:
+        connection.execute(
+            "INSERT OR IGNORE INTO collection_items (collection_id, metadata_id) "
+            "VALUES (?, ?)",
+            (collection_id, metadata_id),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+
+def remove_item_from_collection(
+    collection_id: int,
+    metadata_id: int,
+    db_path: Path | str = DEFAULT_DB_PATH,
+) -> None:
+    """Remove metadata row *metadata_id* from collection *collection_id*.
+
+    Idempotent: removing an item that is not in the collection is a silent
+    no-op.
+    """
+
+    connection = get_connection(db_path)
+    try:
+        connection.execute(
+            "DELETE FROM collection_items "
+            "WHERE collection_id = ? AND metadata_id = ?",
+            (collection_id, metadata_id),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+
+def list_collection_items(
+    collection_id: int,
+    db_path: Path | str = DEFAULT_DB_PATH,
+) -> list[dict]:
+    """Return metadata rows in collection *collection_id*, newest first."""
+
+    connection = get_connection(db_path)
+    try:
+        rows = connection.execute(
+            "SELECT m.id, m.filename, m.path, m.size, m.content_type, m.uploaded_at "
+            "FROM metadata m "
+            "JOIN collection_items ci ON ci.metadata_id = m.id "
+            "WHERE ci.collection_id = ? "
+            "ORDER BY m.id DESC",
+            (collection_id,),
         ).fetchall()
         return [dict(row) for row in rows]
     finally:

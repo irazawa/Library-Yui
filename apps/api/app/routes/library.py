@@ -96,6 +96,15 @@ class CollectionListResponse(BaseModel):
     items: list[CollectionResponse]
 
 
+class CollectionItemAddRequest(BaseModel):
+    metadata_id: int
+
+
+class CollectionItemsResponse(BaseModel):
+    collection: CollectionResponse
+    items: list[UploadResponse]
+
+
 def _count_files(directory: Path) -> int:
     """Count regular files directly inside a storage directory.
 
@@ -789,3 +798,90 @@ def list_collections() -> CollectionListResponse:
         return CollectionListResponse(items=[])
 
     return CollectionListResponse(items=[CollectionResponse(**row) for row in rows])
+
+
+def _resolve_collection(name: str) -> dict:
+    """Return the collection row for *name* or raise a 404."""
+
+    database.init_db(DB_PATH)
+    row = database.get_collection_by_name(name, db_path=DB_PATH)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Collection not found",
+        )
+    return row
+
+
+@router.post(
+    "/collections/{name}/items",
+    response_model=CollectionItemsResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Collections"],
+)
+def add_collection_item(name: str, body: CollectionItemAddRequest) -> CollectionItemsResponse:
+    """Add an uploaded item to a collection.
+
+    Returns 404 for an unknown collection or metadata id. Adding an item
+    that is already in the collection is an idempotent no-op. The response
+    contains the collection and its full item list, newest first.
+    """
+
+    collection = _resolve_collection(name)
+    if not database.metadata_exists(body.metadata_id, DB_PATH):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Metadata row not found",
+        )
+
+    database.add_item_to_collection(
+        collection["id"], body.metadata_id, db_path=DB_PATH
+    )
+    items = database.list_collection_items(collection["id"], db_path=DB_PATH)
+    return CollectionItemsResponse(
+        collection=CollectionResponse(**collection),
+        items=[UploadResponse(**row) for row in items],
+    )
+
+
+@router.get(
+    "/collections/{name}/items",
+    response_model=CollectionItemsResponse,
+    tags=["Collections"],
+)
+def list_collection_items(name: str) -> CollectionItemsResponse:
+    """List the items in a collection, newest first.
+
+    Returns 404 for an unknown collection.
+    """
+
+    collection = _resolve_collection(name)
+    items = database.list_collection_items(collection["id"], db_path=DB_PATH)
+    return CollectionItemsResponse(
+        collection=CollectionResponse(**collection),
+        items=[UploadResponse(**row) for row in items],
+    )
+
+
+@router.delete(
+    "/collections/{name}/items/{metadata_id}",
+    response_model=CollectionItemsResponse,
+    tags=["Collections"],
+)
+def remove_collection_item(name: str, metadata_id: int) -> CollectionItemsResponse:
+    """Remove an item from a collection.
+
+    Returns 404 for an unknown collection. Removing an item that is not in
+    the collection is an idempotent no-op. The response contains the
+    collection and its remaining item list.
+    """
+
+    collection = _resolve_collection(name)
+    database.remove_item_from_collection(
+        collection["id"], metadata_id, db_path=DB_PATH
+    )
+    items = database.list_collection_items(collection["id"], db_path=DB_PATH)
+    return CollectionItemsResponse(
+        collection=CollectionResponse(**collection),
+        items=[UploadResponse(**row) for row in items],
+    )

@@ -842,3 +842,100 @@ def test_list_collections_returns_created_collections_sorted(monkeypatch, tmp_pa
     assert response.status_code == 200
     names = [item["name"] for item in response.json()["items"]]
     assert names == ["alpha", "zeta"]
+
+
+def _seed_collection_with_upload(tmp_path, monkeypatch):
+    """Create a collection plus one metadata row; return (name, metadata_id)."""
+
+    from app import database
+
+    db_path = tmp_path / "library.db"
+    monkeypatch.setattr(library_route, "DB_PATH", db_path)
+    database.init_db(db_path)
+    client.post("/collections", json={"name": "Favorites"})
+    metadata_id = database.insert_metadata(
+        filename="song.mp3",
+        path=str(tmp_path / "song.mp3"),
+        size=123,
+        content_type="audio/mpeg",
+        db_path=db_path,
+    )
+    return "Favorites", metadata_id
+
+
+def test_add_collection_item_returns_201_with_items(monkeypatch, tmp_path):
+    name, metadata_id = _seed_collection_with_upload(tmp_path, monkeypatch)
+
+    response = client.post(
+        f"/collections/{name}/items", json={"metadata_id": metadata_id}
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["collection"]["name"] == name
+    assert [item["id"] for item in body["items"]] == [metadata_id]
+    assert body["items"][0]["filename"] == "song.mp3"
+
+
+def test_add_collection_item_unknown_collection_returns_404(monkeypatch, tmp_path):
+    _, metadata_id = _seed_collection_with_upload(tmp_path, monkeypatch)
+
+    response = client.post(
+        "/collections/nope/items", json={"metadata_id": metadata_id}
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Collection not found"
+
+
+def test_add_collection_item_unknown_metadata_returns_404(monkeypatch, tmp_path):
+    name, _ = _seed_collection_with_upload(tmp_path, monkeypatch)
+
+    response = client.post(f"/collections/{name}/items", json={"metadata_id": 9999})
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Metadata row not found"
+
+
+def test_add_collection_item_is_idempotent(monkeypatch, tmp_path):
+    name, metadata_id = _seed_collection_with_upload(tmp_path, monkeypatch)
+
+    first = client.post(f"/collections/{name}/items", json={"metadata_id": metadata_id})
+    second = client.post(f"/collections/{name}/items", json={"metadata_id": metadata_id})
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert len(second.json()["items"]) == 1
+
+
+def test_list_collection_items_empty_and_unknown(monkeypatch, tmp_path):
+    name, _ = _seed_collection_with_upload(tmp_path, monkeypatch)
+
+    empty = client.get(f"/collections/{name}/items")
+    assert empty.status_code == 200
+    assert empty.json()["items"] == []
+
+    unknown = client.get("/collections/nope/items")
+    assert unknown.status_code == 404
+
+
+def test_remove_collection_item_removes_and_is_idempotent(monkeypatch, tmp_path):
+    name, metadata_id = _seed_collection_with_upload(tmp_path, monkeypatch)
+    client.post(f"/collections/{name}/items", json={"metadata_id": metadata_id})
+
+    removed = client.delete(f"/collections/{name}/items/{metadata_id}")
+    assert removed.status_code == 200
+    assert removed.json()["items"] == []
+
+    again = client.delete(f"/collections/{name}/items/{metadata_id}")
+    assert again.status_code == 200
+    assert again.json()["items"] == []
+
+
+def test_remove_collection_item_unknown_collection_returns_404(monkeypatch, tmp_path):
+    _seed_collection_with_upload(tmp_path, monkeypatch)
+
+    response = client.delete("/collections/nope/items/1")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Collection not found"
