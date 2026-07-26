@@ -508,3 +508,9 @@
 - Task: added a Collections card to the main web app (`apps/web/src/main.tsx` + `styles.css`) — new `useCollections()` hook fetches `GET /collections` on mount (best-effort, empty list on failure) and the card lists collection names with loading and empty states, replacing the static placeholder card.
 - Verification: `cd apps/web && npm run build` — built successfully (tsc + vite), 15 modules transformed.
 - Next small step: add a "New collection" inline form to the Collections card calling `POST /collections`.
+
+## 2026-07-27 02:48 SEAST — Slow Builder
+
+- Task: added a "New collection" inline form to the Collections card (`apps/web/src/main.tsx` + `styles.css`) — text input + Create button calling `POST /collections`; 409 duplicate-name responses and other failures surface via the existing global error banner (`setNotice`); `useCollections()` now accepts a `refreshKey` so the list refreshes after a successful create; input clears on success.
+- Verification: `cd apps/web && npm run build` — built successfully (tsc + vite), 15 modules transformed.
+- Next small step: add an "Add to collection" dropdown + button on each Uploads item calling `POST /collections/{name}/items`.

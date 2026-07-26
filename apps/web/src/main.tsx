@@ -286,12 +286,13 @@ function useLibraryTags() {
 }
 
 /**
- * Fetch the list of collections via `GET /collections` once on mount.
+ * Fetch the list of collections via `GET /collections` on mount and
+ * whenever `refreshKey` changes (bumped after a successful create).
  * Best-effort: any failure yields an empty list (the card shows its
  * empty-state text instead of an error). Returns the items plus a
  * loading flag.
  */
-function useCollections() {
+function useCollections(refreshKey: number = 0) {
   const [items, setItems] = useState<CollectionItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -316,7 +317,7 @@ function useCollections() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshKey]);
 
   return { items, loading };
 }
@@ -554,7 +555,11 @@ function App() {
   const { state, summary } = useLibrarySummary();
   const { items: audioItems, loading: audioLoading } = useLibraryAudio();
   const { items: videoItems, loading: videoLoading } = useLibraryVideo();
-  const { items: collectionItems, loading: collectionsLoading } = useCollections();
+  const [collectionsRefreshKey, setCollectionsRefreshKey] = useState(0);
+  const { items: collectionItems, loading: collectionsLoading } =
+    useCollections(collectionsRefreshKey);
+  const [newCollectionName, setNewCollectionName] = useState('');
+  const [creatingCollection, setCreatingCollection] = useState(false);
   const [activeVideo, setActiveVideo] = useState<VideoItem | null>(null);
   const [activeAudio, setActiveAudio] = useState<AudioItem | null>(null);
   const [url, setUrl] = useState('');
@@ -624,6 +629,32 @@ function App() {
     filterNeedle === ''
       ? uploadItems
       : uploadItems.filter((it) => it.filename.toLowerCase().includes(filterNeedle));
+
+  async function handleCreateCollection(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const name = newCollectionName.trim();
+    if (!name || creatingCollection) return;
+    setCreatingCollection(true);
+    try {
+      const res = await fetch(COLLECTIONS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      if (res.status === 409) {
+        setNotice(`Collection "${name}" already exists.`);
+        return;
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setNewCollectionName('');
+      setCollectionsRefreshKey((k) => k + 1);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Create collection failed';
+      setNotice(`Create collection failed: ${msg}`);
+    } finally {
+      setCreatingCollection(false);
+    }
+  }
 
   async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -955,6 +986,24 @@ function App() {
         </article>
         <article>
           <h2>Collections</h2>
+          <form className="collection-form" onSubmit={handleCreateCollection}>
+            <input
+              type="text"
+              className="collection-input"
+              placeholder="New collection name…"
+              value={newCollectionName}
+              onChange={(e) => setNewCollectionName(e.target.value)}
+              disabled={creatingCollection}
+              aria-label="New collection name"
+            />
+            <button
+              type="submit"
+              className="collection-create"
+              disabled={creatingCollection || newCollectionName.trim() === ''}
+            >
+              {creatingCollection ? 'Creating…' : 'Create'}
+            </button>
+          </form>
           {collectionsLoading ? (
             <p>Loading collections…</p>
           ) : collectionItems.length === 0 ? (

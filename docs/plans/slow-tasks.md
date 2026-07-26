@@ -157,7 +157,7 @@ a single `pytest` run (backend), `npm run build` (frontend), or
 `tests/test_jobs.py` / `tests/test_database.py`).
 
 - [x] Add a Collections card to the main web app (`apps/web/src/main.tsx` + `styles.css`) that fetches `GET /collections` on mount and lists collection names (empty-state text when none); verify with `npm run build` in `apps/web`.
-- [ ] Add a "New collection" inline form to the Collections card calling `POST /collections` (surface 409 duplicate-name errors via the existing global error banner, refresh the list on success); verify with `npm run build` in `apps/web`.
+- [x] Add a "New collection" inline form to the Collections card calling `POST /collections` (surface 409 duplicate-name errors via the existing global error banner, refresh the list on success); verify with `npm run build` in `apps/web`.
 - [ ] Add an "Add to collection" dropdown + button on each Uploads item (`apps/web/src/main.tsx`) calling `POST /collections/{name}/items` with the item's `metadata_id`; verify with `npm run build` in `apps/web`.
 - [ ] Add a `_maybe_record_video_metadata()` helper in `apps/api/app/routes/jobs.py` mirroring the audio version — after a successful flag-gated `mode == "video"` download, insert a `metadata` row for the newest `.mp4` in `VIDEO_DIR` with `content_type="video/mp4"` (idempotent by path, best-effort); add tests in `tests/test_jobs.py`.
 - [ ] Add a UNIQUE constraint on `(collection_id, metadata_id)` in the `collection_items` table in `init_db()` (with migration handling for pre-existing DBs) so duplicates are impossible at the DB layer, keeping the endpoint idempotent; add tests in `tests/test_database.py`.
