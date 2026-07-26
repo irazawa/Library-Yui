@@ -11,6 +11,7 @@ const JOBS_URL = `${API_BASE_URL}/jobs`;
 const UPLOAD_URL = `${API_BASE_URL}/library/upload`;
 const UPLOADS_URL = `${API_BASE_URL}/library/uploads`;
 const LIBRARY_TAGS_URL = `${API_BASE_URL}/library/tags`;
+const COLLECTIONS_URL = `${API_BASE_URL}/collections`;
 const JOB_POLL_INTERVAL_MS = 2000;
 const TERMINAL_STATUSES = new Set(['completed', 'failed']);
 
@@ -80,6 +81,15 @@ interface UploadItem {
 interface UploadListResponse {
   items: UploadItem[];
   total: number;
+}
+
+interface CollectionItem {
+  id: number;
+  name: string;
+}
+
+interface CollectionListResponse {
+  items: CollectionItem[];
 }
 
 /**
@@ -273,6 +283,42 @@ function useLibraryTags() {
   }, []);
 
   return tags;
+}
+
+/**
+ * Fetch the list of collections via `GET /collections` once on mount.
+ * Best-effort: any failure yields an empty list (the card shows its
+ * empty-state text instead of an error). Returns the items plus a
+ * loading flag.
+ */
+function useCollections() {
+  const [items, setItems] = useState<CollectionItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    fetch(COLLECTIONS_URL)
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = (await res.json()) as CollectionListResponse;
+        if (cancelled) return;
+        setItems(data.items);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setItems([]);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return { items, loading };
 }
 
 function useLibraryUploads(refreshKey: number, tag: string = '') {
@@ -508,6 +554,7 @@ function App() {
   const { state, summary } = useLibrarySummary();
   const { items: audioItems, loading: audioLoading } = useLibraryAudio();
   const { items: videoItems, loading: videoLoading } = useLibraryVideo();
+  const { items: collectionItems, loading: collectionsLoading } = useCollections();
   const [activeVideo, setActiveVideo] = useState<VideoItem | null>(null);
   const [activeAudio, setActiveAudio] = useState<AudioItem | null>(null);
   const [url, setUrl] = useState('');
@@ -906,7 +953,22 @@ function App() {
             </>
           )}
         </article>
-        <article><h2>Collections</h2><p>Anime, Hololive, OST, mood lists, and custom tags.</p></article>
+        <article>
+          <h2>Collections</h2>
+          {collectionsLoading ? (
+            <p>Loading collections…</p>
+          ) : collectionItems.length === 0 ? (
+            <p>No collections yet. Anime, Hololive, OST, and mood lists will live here.</p>
+          ) : (
+            <ul className="audio-list">
+              {collectionItems.map((col) => (
+                <li key={col.id} className="collection-item">
+                  <span className="collection-name">{col.name}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </article>
       </section>
       {activeVideo && (
         <div
