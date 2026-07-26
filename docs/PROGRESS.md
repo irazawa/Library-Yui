@@ -490,3 +490,10 @@
 - Task: added a persistent bottom-docked audio player bar to the main web app (`AudioPlayerBar` in `apps/web/src/main.tsx` + `.player-bar` styles) — audio items in the Audio card now have a ▶ button that opens the bar, which streams via `GET /library/audio/{name}` with play/pause toggle, title, and close button (autoplay best-effort).
 - Verification: `cd apps/web && npm run build` — built successfully (tsc + vite), 15 modules transformed.
 - Next small step: add a tag-based quick-filter dropdown to the main web app Uploads card using `GET /library/tags` + `?tag=` filtering.
+
+## 2026-07-26 11:38 SEAST — Slow Builder
+
+- Task: added a tag-based quick-filter dropdown to the main web app Uploads card (`apps/web/src/main.tsx` + `styles.css`) — new `useLibraryTags()` hook fetches `GET /library/tags` once on mount; selecting a tag re-fetches the uploads list server-side via `?tag=` on `GET /library/uploads` (works with pagination/`Load more` and the existing filename filter; "All tags" resets).
+- Verification: `cd apps/web && npm run build` — built successfully (tsc + vite), 15 modules transformed.
+- Next small step: all queued tasks complete — next run should generate a fresh batch of tiny tasks (via `agy` Gemini, or fallback) before implementing anything.
+

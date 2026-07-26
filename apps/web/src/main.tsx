@@ -10,6 +10,7 @@ const LIBRARY_THUMBNAILS_URL = `${API_BASE_URL}/library/thumbnails`;
 const JOBS_URL = `${API_BASE_URL}/jobs`;
 const UPLOAD_URL = `${API_BASE_URL}/library/upload`;
 const UPLOADS_URL = `${API_BASE_URL}/library/uploads`;
+const LIBRARY_TAGS_URL = `${API_BASE_URL}/library/tags`;
 const JOB_POLL_INTERVAL_MS = 2000;
 const TERMINAL_STATUSES = new Set(['completed', 'failed']);
 
@@ -245,7 +246,36 @@ function useLibraryVideo() {
  */
 const UPLOADS_PAGE_SIZE = 10;
 
-function useLibraryUploads(refreshKey: number) {
+/**
+ * Fetch all tag names once on mount via `GET /library/tags`.
+ * Best-effort: any failure yields an empty list (the dropdown simply
+ * offers no tags to filter by).
+ */
+function useLibraryTags() {
+  const [tags, setTags] = useState<string[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(LIBRARY_TAGS_URL)
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = (await res.json()) as { tags: string[] };
+        if (cancelled) return;
+        setTags(data.tags);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setTags([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return tags;
+}
+
+function useLibraryUploads(refreshKey: number, tag: string = '') {
   const [items, setItems] = useState<UploadItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -259,6 +289,7 @@ function useLibraryUploads(refreshKey: number) {
     setLoading(true);
     setOffset(0);
     const params = new URLSearchParams({ limit: String(UPLOADS_PAGE_SIZE), offset: '0' });
+    if (tag !== '') params.set('tag', tag);
     fetch(`${UPLOADS_URL}?${params.toString()}`)
       .then(async (res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -279,7 +310,7 @@ function useLibraryUploads(refreshKey: number) {
     return () => {
       cancelled = true;
     };
-  }, [refreshKey]);
+  }, [refreshKey, tag]);
 
   const hasMore = items.length < total;
 
@@ -291,6 +322,7 @@ function useLibraryUploads(refreshKey: number) {
       limit: String(UPLOADS_PAGE_SIZE),
       offset: String(nextOffset),
     });
+    if (tag !== '') params.set('tag', tag);
     fetch(`${UPLOADS_URL}?${params.toString()}`)
       .then(async (res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -488,6 +520,10 @@ function App() {
   const [uploadNote, setUploadNote] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadsRefreshKey, setUploadsRefreshKey] = useState(0);
+  // Tag-based quick filter: fetched once on mount; selecting a tag re-fetches
+  // the uploads list server-side via `?tag=` on `GET /library/uploads`.
+  const availableTags = useLibraryTags();
+  const [uploadsTagFilter, setUploadsTagFilter] = useState('');
   const {
     items: uploadItems,
     total: uploadTotal,
@@ -495,7 +531,7 @@ function App() {
     loadingMore: uploadsLoadingMore,
     hasMore: uploadsHasMore,
     loadMore: uploadsLoadMore,
-  } = useLibraryUploads(uploadsRefreshKey);
+  } = useLibraryUploads(uploadsRefreshKey, uploadsTagFilter);
   const [uploadsFilter, setUploadsFilter] = useState('');
   // Per-upload tags map (metadataId -> tag list). Lazily fetched for each
   // upload item via `GET /library/metadata/{id}` once the uploads list is
@@ -793,10 +829,25 @@ function App() {
           <h2>Uploads</h2>
           {uploadsLoading ? (
             <p>Loading uploads…</p>
-          ) : uploadItems.length === 0 ? (
+          ) : uploadItems.length === 0 && uploadsTagFilter === '' ? (
             <p>Uploaded files will appear here.</p>
           ) : (
             <>
+              {availableTags.length > 0 && (
+                <select
+                  className="uploads-tag-filter"
+                  value={uploadsTagFilter}
+                  onChange={(e) => setUploadsTagFilter(e.target.value)}
+                  aria-label="Filter uploads by tag"
+                >
+                  <option value="">All tags</option>
+                  {availableTags.map((tag) => (
+                    <option key={tag} value={tag}>
+                      {tag}
+                    </option>
+                  ))}
+                </select>
+              )}
               <input
                 type="search"
                 className="uploads-filter"
@@ -806,7 +857,11 @@ function App() {
                 aria-label="Filter uploads by filename"
               />
               {visibleUploadItems.length === 0 ? (
-                <p className="uploads-empty">No uploads match "{uploadsFilter}".</p>
+                <p className="uploads-empty">
+                  {filterNeedle !== ''
+                    ? `No uploads match "${uploadsFilter}".`
+                    : `No uploads tagged "${uploadsTagFilter}".`}
+                </p>
               ) : (
                 <ul className="audio-list">
                   {visibleUploadItems.map((item) => (
