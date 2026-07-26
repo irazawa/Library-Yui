@@ -497,3 +497,10 @@
 - Verification: `cd apps/web && npm run build` — built successfully (tsc + vite), 15 modules transformed.
 - Next small step: all queued tasks complete — next run should generate a fresh batch of tiny tasks (via `agy` Gemini, or fallback) before implementing anything.
 
+## 2026-07-26 16:41 SEAST — Slow Builder (plan refresh)
+
+- Task: all previous slow-tasks were complete; generated the next batch of 8 tiny tasks via Gemini 3.5 Flash (`agy --model "Gemini 3.5 Flash (High)" --print`) and merged into `docs/plans/slow-tasks.md`. Focus: Collections UI in the main web app (list card, create form, add-to-collection control), `_maybe_record_video_metadata()` mirroring the audio path, `collection_items` UNIQUE constraint, dual-write failure warning logs, plus `docs/SCHEMA.md` and a README Collections section. Gemini's suggestions were adapted to Library-Yui conventions (single-page card layout in `apps/web/src/main.tsx` — no router; existing test file layout). No implementation done this run per cron rule (plan update only).
+- Verification: docs-only plan update — `git diff --check` clean.
+- Next small step: add a Collections card to the main web app that fetches `GET /collections` on mount and lists collection names.
+
+

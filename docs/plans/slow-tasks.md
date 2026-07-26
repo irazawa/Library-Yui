@@ -144,3 +144,23 @@ dual-write persistence, filesystem-based `library/` storage,
 - [x] Add `POST /collections/{name}/items` (body `{metadata_id}`) and `DELETE /collections/{name}/items/{metadata_id}` endpoints plus a `GET /collections/{name}/items` list, backed by a new `collection_items` join table (`collection_id`, `metadata_id`) added to `init_db()`; add tests in `tests/test_library.py` covering add/list/remove and 404 for unknown collections.
 - [x] Add a persistent bottom-docked audio player bar to the main web app (`apps/web/src/main.tsx` + `styles.css`) that plays the currently selected audio item via `GET /library/audio/{name}` and shows title + play/pause; verify with `npm run build` in `apps/web`.
 - [x] Add a tag-based quick-filter dropdown to the main web app Uploads card (`apps/web/src/main.tsx`) that fetches `GET /library/tags` once on mount and lets the user pick a tag to filter the uploads list via `?tag=` on `GET /library/uploads`; verify with `npm run build` in `apps/web`.
+
+## Next batch (generated 2026-07-26 via Gemini 3.5 Flash)
+
+Collections UI in the main web app, video metadata rows on download, minor
+robustness, and docs. Each task is small, self-contained, and verifiable with
+a single `pytest` run (backend), `npm run build` (frontend), or
+`git diff --check` (docs). Adapted to Library-Yui conventions (single-page
+`apps/web/src/main.tsx` card layout — no router; SQLite helpers in
+`apps/api/app/database.py`; `_maybe_record_audio_metadata` pattern in
+`apps/api/app/routes/jobs.py`; tests in `tests/test_library.py` /
+`tests/test_jobs.py` / `tests/test_database.py`).
+
+- [ ] Add a Collections card to the main web app (`apps/web/src/main.tsx` + `styles.css`) that fetches `GET /collections` on mount and lists collection names (empty-state text when none); verify with `npm run build` in `apps/web`.
+- [ ] Add a "New collection" inline form to the Collections card calling `POST /collections` (surface 409 duplicate-name errors via the existing global error banner, refresh the list on success); verify with `npm run build` in `apps/web`.
+- [ ] Add an "Add to collection" dropdown + button on each Uploads item (`apps/web/src/main.tsx`) calling `POST /collections/{name}/items` with the item's `metadata_id`; verify with `npm run build` in `apps/web`.
+- [ ] Add a `_maybe_record_video_metadata()` helper in `apps/api/app/routes/jobs.py` mirroring the audio version — after a successful flag-gated `mode == "video"` download, insert a `metadata` row for the newest `.mp4` in `VIDEO_DIR` with `content_type="video/mp4"` (idempotent by path, best-effort); add tests in `tests/test_jobs.py`.
+- [ ] Add a UNIQUE constraint on `(collection_id, metadata_id)` in the `collection_items` table in `init_db()` (with migration handling for pre-existing DBs) so duplicates are impossible at the DB layer, keeping the endpoint idempotent; add tests in `tests/test_database.py`.
+- [ ] Add a `warning`-level log line (module logger) in `apps/api/app/jobs.py` when dual-write persistence fails (`_persist_job` / `_unpersist_job` swallow paths) so DB issues are visible without breaking the in-memory store; add a caplog test in `tests/test_jobs.py`.
+- [ ] Add `docs/SCHEMA.md` documenting the SQLite schema (`metadata`, `tags`, `metadata_tags`, `jobs`, `collections`, `collection_items` — columns, constraints, relationships); verify with `git diff --check`.
+- [ ] Update `README.md` with a short Collections section (what they are, the `POST/GET /collections` + items endpoints, and how tags differ from collections); verify with `git diff --check`.
