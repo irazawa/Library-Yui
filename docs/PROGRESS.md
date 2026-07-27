@@ -526,3 +526,8 @@
 - Task: added `_maybe_record_video_metadata()` helper in `apps/api/app/routes/jobs.py` mirroring the audio version — after a successful flag-gated `mode == "video"` download it inserts a `metadata` row for the newest `.mp4` in `VIDEO_DIR` (`content_type="video/mp4"`, idempotent by absolute path, best-effort so a DB error never fails the job); added 3 tests in `tests/test_jobs.py` (row recorded, idempotency, failure does not fail job).
 - Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_jobs.py -q` — 48 passed.
 - Next small step: add a UNIQUE constraint on `(collection_id, metadata_id)` in `collection_items` with migration handling.
+## 2026-07-27 17:59 SEAST — Slow Builder (collection_items UNIQUE constraint)
+
+- Task: enforced uniqueness of `(collection_id, metadata_id)` in `collection_items` at the DB layer — added `_migrate_collection_items_unique()` in `apps/api/app/database.py` that rebuilds legacy tables lacking the composite primary key (collapsing duplicates via `INSERT OR IGNORE`) and creates an explicit `idx_collection_items_unique` UNIQUE index idempotently; added 4 tests in `tests/test_database.py` (duplicate insert raises IntegrityError, index exists, legacy migration collapses dupes + gains PK, idempotent re-runs).
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_database.py tests/test_health.py tests/test_library.py -q` — 97 passed.
+- Next small step: add a warning-level log line in `apps/api/app/jobs.py` when dual-write persistence fails, plus a caplog test.

@@ -134,6 +134,7 @@ def init_db(db_path: Path | str = DEFAULT_DB_PATH) -> None:
             )
             """
         )
+        _migrate_collection_items_unique(connection)
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS jobs (
@@ -149,6 +150,58 @@ def init_db(db_path: Path | str = DEFAULT_DB_PATH) -> None:
         connection.commit()
     finally:
         connection.close()
+
+
+def _migrate_collection_items_unique(connection: sqlite3.Connection) -> None:
+    """Ensure ``collection_items`` enforces unique memberships at the DB layer.
+
+    Fresh databases already get uniqueness from the composite
+    ``PRIMARY KEY (collection_id, metadata_id)``. Pre-existing databases whose
+    ``collection_items`` table was created without that primary key (or with a
+    different shape) are rebuilt in place: rows are copied over with
+    ``INSERT OR IGNORE`` so duplicate memberships collapse to a single row.
+
+    An explicit UNIQUE index is also created (idempotently) so the constraint
+    is visible and enforced independently of the table's primary key.
+    """
+
+    row = connection.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' "
+        "AND name = 'collection_items'"
+    ).fetchone()
+    if row is not None:
+        pk_columns = [
+            info["name"]
+            for info in connection.execute(
+                "PRAGMA table_info(collection_items)"
+            ).fetchall()
+            if info["pk"]
+        ]
+        if pk_columns != ["collection_id", "metadata_id"]:
+            # Legacy table without the composite primary key: rebuild it,
+            # collapsing any duplicate memberships along the way.
+            connection.execute(
+                """
+                CREATE TABLE collection_items_new (
+                    collection_id INTEGER NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+                    metadata_id INTEGER NOT NULL REFERENCES metadata(id) ON DELETE CASCADE,
+                    PRIMARY KEY (collection_id, metadata_id)
+                )
+                """
+            )
+            connection.execute(
+                "INSERT OR IGNORE INTO collection_items_new "
+                "(collection_id, metadata_id) "
+                "SELECT collection_id, metadata_id FROM collection_items"
+            )
+            connection.execute("DROP TABLE collection_items")
+            connection.execute(
+                "ALTER TABLE collection_items_new RENAME TO collection_items"
+            )
+    connection.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_collection_items_unique "
+        "ON collection_items (collection_id, metadata_id)"
+    )
 
 
 def _now_iso() -> str:

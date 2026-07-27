@@ -724,3 +724,119 @@ def test_init_db_migrates_existing_pre_collections_database(tmp_path):
     rows = database.list_metadata(db_path=db_path)
     assert len(rows) == 1
     assert rows[0]["filename"] == "old.mp3"
+
+
+def test_collection_items_pair_is_unique(tmp_path):
+    """Inserting the same (collection_id, metadata_id) twice fails at the DB
+    layer with an IntegrityError."""
+    db_path = tmp_path / "library.db"
+    database.init_db(db_path=db_path)
+
+    connection = sqlite3.connect(str(db_path))
+    try:
+        connection.execute(
+            "INSERT INTO collection_items (collection_id, metadata_id) "
+            "VALUES (1, 1)"
+        )
+        connection.commit()
+        try:
+            connection.execute(
+                "INSERT INTO collection_items (collection_id, metadata_id) "
+                "VALUES (1, 1)"
+            )
+        except sqlite3.IntegrityError:
+            pass
+        else:
+            raise AssertionError("duplicate collection_items row was allowed")
+    finally:
+        connection.close()
+
+
+def test_collection_items_has_unique_index(tmp_path):
+    """init_db creates the explicit UNIQUE index on collection_items."""
+    db_path = tmp_path / "library.db"
+    database.init_db(db_path=db_path)
+
+    connection = sqlite3.connect(str(db_path))
+    try:
+        row = connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'index' "
+            "AND name = 'idx_collection_items_unique'"
+        ).fetchone()
+    finally:
+        connection.close()
+    assert row is not None
+
+
+def test_init_db_migrates_legacy_collection_items_without_pk(tmp_path):
+    """A legacy collection_items table without the composite primary key is
+    rebuilt with the constraint, collapsing duplicate memberships."""
+    db_path = tmp_path / "library.db"
+
+    connection = sqlite3.connect(str(db_path))
+    try:
+        connection.execute(
+            "CREATE TABLE collections ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE)"
+        )
+        connection.execute(
+            "CREATE TABLE collection_items ("
+            "collection_id INTEGER NOT NULL, metadata_id INTEGER NOT NULL)"
+        )
+        connection.executemany(
+            "INSERT INTO collection_items (collection_id, metadata_id) "
+            "VALUES (?, ?)",
+            [(1, 1), (1, 1), (1, 2)],
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    database.init_db(db_path=db_path)
+
+    connection = sqlite3.connect(str(db_path))
+    try:
+        rows = connection.execute(
+            "SELECT collection_id, metadata_id FROM collection_items "
+            "ORDER BY collection_id, metadata_id"
+        ).fetchall()
+        pk_columns = [
+            info[1]
+            for info in connection.execute(
+                "PRAGMA table_info(collection_items)"
+            ).fetchall()
+            if info[5]
+        ]
+    finally:
+        connection.close()
+
+    assert rows == [(1, 1), (1, 2)]
+    assert pk_columns == ["collection_id", "metadata_id"]
+
+
+def test_collection_items_migration_is_idempotent(tmp_path):
+    """Running init_db repeatedly leaves collection_items rows untouched."""
+    db_path = tmp_path / "library.db"
+    database.init_db(db_path=db_path)
+
+    connection = sqlite3.connect(str(db_path))
+    try:
+        connection.execute(
+            "INSERT INTO collection_items (collection_id, metadata_id) "
+            "VALUES (3, 7)"
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    database.init_db(db_path=db_path)
+    database.init_db(db_path=db_path)
+
+    connection = sqlite3.connect(str(db_path))
+    try:
+        rows = connection.execute(
+            "SELECT collection_id, metadata_id FROM collection_items"
+        ).fetchall()
+    finally:
+        connection.close()
+    assert rows == [(3, 7)]
