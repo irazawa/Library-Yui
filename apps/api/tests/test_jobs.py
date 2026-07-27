@@ -1026,6 +1026,72 @@ def test_job_persistence_swallows_db_error(monkeypatch, tmp_path) -> None:
         set_jobs_db_path(database.DEFAULT_DB_PATH)
 
 
+def test_persist_job_failure_logs_warning(monkeypatch, tmp_path, caplog) -> None:
+    """A dual-write failure in ``_persist_job`` emits a warning log line."""
+
+    def boom(*args, **kwargs):
+        raise sqlite3.OperationalError("disk full")
+
+    monkeypatch.setattr(jobs_mod, "init_db", boom)
+    set_jobs_db_path(tmp_path / "library.db")
+    try:
+        with caplog.at_level("WARNING", logger="app.jobs"):
+            job = create_job("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+        # The in-memory store still holds the job...
+        assert get_job(job["id"]) is not None
+        # ...and the swallowed DB error is surfaced via the module logger.
+        assert any(
+            "Job persistence failed" in record.message and job["id"] in record.message
+            for record in caplog.records
+        )
+    finally:
+        set_jobs_db_path(database.DEFAULT_DB_PATH)
+
+
+def test_unpersist_job_failure_logs_warning(monkeypatch, tmp_path, caplog) -> None:
+    """A dual-write failure in ``_unpersist_job`` emits a warning log line.
+
+    A missing ``jobs`` table stays a quiet no-op; only a real database
+    error (e.g. disk I/O) should produce the warning.
+    """
+
+    job = create_job("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+
+    def boom(*args, **kwargs):
+        raise sqlite3.OperationalError("disk I/O error")
+
+    monkeypatch.setattr(jobs_mod, "get_connection", boom)
+    with caplog.at_level("WARNING", logger="app.jobs"):
+        removed = jobs_mod.delete_job(job["id"])
+
+    # The in-memory removal still succeeds despite the DB failure...
+    assert removed is True
+    assert get_job(job["id"]) is None
+    # ...and the swallowed DB error is surfaced via the module logger.
+    assert any(
+        "Job unpersist failed" in record.message and job["id"] in record.message
+        for record in caplog.records
+    )
+
+
+def test_unpersist_job_missing_table_stays_quiet(monkeypatch, tmp_path, caplog) -> None:
+    """A missing ``jobs`` table during unpersist must not emit a warning."""
+
+    job = create_job("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+
+    def missing_table(*args, **kwargs):
+        raise sqlite3.OperationalError("no such table: jobs")
+
+    monkeypatch.setattr(jobs_mod, "get_connection", missing_table)
+    with caplog.at_level("WARNING", logger="app.jobs"):
+        removed = jobs_mod.delete_job(job["id"])
+
+    assert removed is True
+    assert not any(
+        "Job unpersist failed" in record.message for record in caplog.records
+    )
+
+
 # ---------------------------------------------------------------------------
 # DELETE /jobs/{id}
 # ---------------------------------------------------------------------------

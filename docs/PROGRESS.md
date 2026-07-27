@@ -531,3 +531,9 @@
 - Task: enforced uniqueness of `(collection_id, metadata_id)` in `collection_items` at the DB layer — added `_migrate_collection_items_unique()` in `apps/api/app/database.py` that rebuilds legacy tables lacking the composite primary key (collapsing duplicates via `INSERT OR IGNORE`) and creates an explicit `idx_collection_items_unique` UNIQUE index idempotently; added 4 tests in `tests/test_database.py` (duplicate insert raises IntegrityError, index exists, legacy migration collapses dupes + gains PK, idempotent re-runs).
 - Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_database.py tests/test_health.py tests/test_library.py -q` — 97 passed.
 - Next small step: add a warning-level log line in `apps/api/app/jobs.py` when dual-write persistence fails, plus a caplog test.
+
+## 2026-07-27 23:01 SEAST — Slow Builder
+
+- Task: added caplog test coverage for the dual-write persistence warning logs in `apps/api/app/jobs.py` — `tests/test_jobs.py` now verifies `_persist_job` failures log "Job persistence failed", `_unpersist_job` failures log "Job unpersist failed" (with the in-memory store unaffected in both cases), and a missing `jobs` table stays a quiet no-op. The warning log lines themselves already existed in `jobs.py`, so this task was test-only.
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_jobs.py -q` — 51 passed.
+- Next small step: add `docs/SCHEMA.md` documenting the SQLite schema.
