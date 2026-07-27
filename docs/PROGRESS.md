@@ -514,3 +514,9 @@
 - Task: added a "New collection" inline form to the Collections card (`apps/web/src/main.tsx` + `styles.css`) — text input + Create button calling `POST /collections`; 409 duplicate-name responses and other failures surface via the existing global error banner (`setNotice`); `useCollections()` now accepts a `refreshKey` so the list refreshes after a successful create; input clears on success.
 - Verification: `cd apps/web && npm run build` — built successfully (tsc + vite), 15 modules transformed.
 - Next small step: add an "Add to collection" dropdown + button on each Uploads item calling `POST /collections/{name}/items`.
+
+## 2026-07-27 07:52 SEAST — Slow Builder
+
+- Task: added a per-upload "Add to collection" control (`AddToCollectionControl` in `apps/web/src/main.tsx` + `styles.css`) — a dropdown of existing collections plus an Add button calling `POST /collections/{name}/items` with the item's `metadata_id`, with a small "Added to <name>" confirmation and errors surfaced via the global banner; hidden when no collections exist.
+- Verification: `cd apps/web && npm run build` — built successfully (tsc + vite).
+- Next small step: add `_maybe_record_video_metadata()` helper in `apps/api/app/routes/jobs.py` for video downloads.

@@ -486,6 +486,77 @@ function TagEditor({ metadataId, tags, onTagsChange, onError }: TagEditorProps) 
 }
 
 /**
+ * Per-upload "Add to collection" control: a dropdown of existing
+ * collections plus a button that calls `POST /collections/{name}/items`
+ * with the item's `metadata_id`. Hidden entirely when no collections
+ * exist yet. Errors surface via the shared error banner callback.
+ */
+interface AddToCollectionControlProps {
+  metadataId: number;
+  collections: CollectionItem[];
+  onError: (msg: string) => void;
+}
+
+function AddToCollectionControl({ metadataId, collections, onError }: AddToCollectionControlProps) {
+  const [selected, setSelected] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [added, setAdded] = useState('');
+
+  if (collections.length === 0) return null;
+
+  async function handleAdd() {
+    const name = selected.trim();
+    if (!name || busy) return;
+    setBusy(true);
+    setAdded('');
+    try {
+      const res = await fetch(`${COLLECTIONS_URL}/${encodeURIComponent(name)}/items`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ metadata_id: metadataId }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setAdded(name);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Add to collection failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="collection-add">
+      <select
+        className="collection-add-select"
+        value={selected}
+        onChange={(e) => {
+          setSelected(e.target.value);
+          setAdded('');
+        }}
+        disabled={busy}
+        aria-label={`Choose collection for upload ${metadataId}`}
+      >
+        <option value="">Add to collection…</option>
+        {collections.map((col) => (
+          <option key={col.id} value={col.name}>
+            {col.name}
+          </option>
+        ))}
+      </select>
+      <button
+        type="button"
+        className="collection-add-button"
+        onClick={handleAdd}
+        disabled={busy || selected === ''}
+      >
+        {busy ? '…' : 'Add'}
+      </button>
+      {added !== '' && <span className="collection-add-done">Added to {added}</span>}
+    </div>
+  );
+}
+
+/**
  * Persistent bottom-docked audio player bar. Plays the currently selected
  * audio item via `GET /library/audio/{name}` with a play/pause toggle and
  * a close button. Autoplays whenever the selected track changes.
@@ -958,6 +1029,11 @@ function App() {
                           setUploadTags((prev) => ({ ...prev, [item.id]: tags }))
                         }
                         onError={(msg) => setNotice(`Tag edit failed: ${msg}`)}
+                      />
+                      <AddToCollectionControl
+                        metadataId={item.id}
+                        collections={collectionItems}
+                        onError={(msg) => setNotice(`Add to collection failed: ${msg}`)}
                       />
                     </li>
                   ))}
