@@ -520,3 +520,9 @@
 - Task: added a per-upload "Add to collection" control (`AddToCollectionControl` in `apps/web/src/main.tsx` + `styles.css`) — a dropdown of existing collections plus an Add button calling `POST /collections/{name}/items` with the item's `metadata_id`, with a small "Added to <name>" confirmation and errors surfaced via the global banner; hidden when no collections exist.
 - Verification: `cd apps/web && npm run build` — built successfully (tsc + vite).
 - Next small step: add `_maybe_record_video_metadata()` helper in `apps/api/app/routes/jobs.py` for video downloads.
+
+## 2026-07-27 12:55 SEAST — Slow Builder
+
+- Task: added `_maybe_record_video_metadata()` helper in `apps/api/app/routes/jobs.py` mirroring the audio version — after a successful flag-gated `mode == "video"` download it inserts a `metadata` row for the newest `.mp4` in `VIDEO_DIR` (`content_type="video/mp4"`, idempotent by absolute path, best-effort so a DB error never fails the job); added 3 tests in `tests/test_jobs.py` (row recorded, idempotency, failure does not fail job).
+- Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_jobs.py -q` — 48 passed.
+- Next small step: add a UNIQUE constraint on `(collection_id, metadata_id)` in `collection_items` with migration handling.

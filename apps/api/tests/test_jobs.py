@@ -748,6 +748,117 @@ def test_start_job_audio_mode_metadata_failure_does_not_fail_job(monkeypatch, tm
 
 
 # ---------------------------------------------------------------------------
+# Metadata recording for completed video downloads
+# ---------------------------------------------------------------------------
+
+def test_start_job_video_mode_records_metadata_row(monkeypatch, tmp_path):
+    """A completed video download must record a ``metadata`` row with the
+    produced file's filename, absolute path, size, and ``video/mp4``."""
+
+    monkeypatch.setenv(DOWNLOADS_ENABLED_FLAG, "1")
+
+    video_dir = tmp_path / "video"
+    video_dir.mkdir(exist_ok=True)
+    db_path = tmp_path / "metadata.db"
+    monkeypatch.setattr(jobs_routes, "VIDEO_DIR", video_dir)
+    monkeypatch.setattr(jobs_routes, "METADATA_DB_PATH", db_path)
+    # Keep the thumbnail step inert so no real ffmpeg call is attempted.
+    monkeypatch.setattr(jobs_routes, "extract_thumbnail", lambda *a, **k: None)
+
+    def fake_mp4(url, output_dir=None):
+        # Simulate yt-dlp producing an MP4 in the video dir.
+        (video_dir / "My Clip.mp4").write_bytes(b"fake mp4 bytes")
+        return {"ok": True, "returncode": 0, "command": ["yt-dlp", url]}
+
+    monkeypatch.setattr(jobs_routes, "download_mp4", fake_mp4)
+
+    client = TestClient(app)
+    created = client.post(
+        "/jobs",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "mode": "video"},
+    ).json()
+
+    response = client.post(f"/jobs/{created['id']}/start")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "completed"
+
+    rows = _read_metadata_rows(db_path)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["filename"] == "My Clip.mp4"
+    assert row["path"] == str((video_dir / "My Clip.mp4").resolve())
+    assert row["size"] == len(b"fake mp4 bytes")
+    assert row["content_type"] == "video/mp4"
+
+
+def test_start_job_video_mode_metadata_recording_is_idempotent(monkeypatch, tmp_path):
+    """Downloading twice with the same produced file must not duplicate the
+    ``metadata`` row (matched by absolute path)."""
+
+    monkeypatch.setenv(DOWNLOADS_ENABLED_FLAG, "1")
+
+    video_dir = tmp_path / "video"
+    video_dir.mkdir(exist_ok=True)
+    db_path = tmp_path / "metadata.db"
+    monkeypatch.setattr(jobs_routes, "VIDEO_DIR", video_dir)
+    monkeypatch.setattr(jobs_routes, "METADATA_DB_PATH", db_path)
+    monkeypatch.setattr(jobs_routes, "extract_thumbnail", lambda *a, **k: None)
+
+    def fake_mp4(url, output_dir=None):
+        (video_dir / "Same Clip.mp4").write_bytes(b"bytes")
+        return {"ok": True, "returncode": 0, "command": ["yt-dlp", url]}
+
+    monkeypatch.setattr(jobs_routes, "download_mp4", fake_mp4)
+
+    client = TestClient(app)
+    for _ in range(2):
+        created = client.post(
+            "/jobs",
+            json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "mode": "video"},
+        ).json()
+        response = client.post(f"/jobs/{created['id']}/start")
+        assert response.json()["status"] == "completed"
+
+    assert len(_read_metadata_rows(db_path)) == 1
+
+
+def test_start_job_video_mode_metadata_failure_does_not_fail_job(monkeypatch, tmp_path):
+    """If video metadata recording raises, the job must still report
+    ``completed`` — the metadata step is best-effort and never fails the
+    job."""
+
+    monkeypatch.setenv(DOWNLOADS_ENABLED_FLAG, "1")
+
+    video_dir = tmp_path / "video"
+    video_dir.mkdir(exist_ok=True)
+    (video_dir / "Clip.mp4").write_bytes(b"bytes")
+    monkeypatch.setattr(jobs_routes, "VIDEO_DIR", video_dir)
+    monkeypatch.setattr(jobs_routes, "METADATA_DB_PATH", tmp_path / "metadata.db")
+    monkeypatch.setattr(jobs_routes, "extract_thumbnail", lambda *a, **k: None)
+
+    def fake_mp4(url, output_dir=None):
+        return {"ok": True, "returncode": 0, "command": ["yt-dlp", url]}
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("db exploded")
+
+    monkeypatch.setattr(jobs_routes, "download_mp4", fake_mp4)
+    monkeypatch.setattr(jobs_routes.database, "insert_metadata", boom)
+
+    client = TestClient(app)
+    created = client.post(
+        "/jobs",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "mode": "video"},
+    ).json()
+
+    response = client.post(f"/jobs/{created['id']}/start")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "completed"
+
+
+# ---------------------------------------------------------------------------
 # POST /jobs `mode` field (audio | video)
 # ---------------------------------------------------------------------------
 

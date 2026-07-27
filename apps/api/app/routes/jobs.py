@@ -164,6 +164,10 @@ def _maybe_run_download(job_id: str) -> JobResponse | None:
         # flag-gated; this step must never fail the job.
         if mode == "video":
             _maybe_extract_thumbnails()
+            # Also record a best-effort ``metadata`` row for the produced
+            # MP4 so the library knows about the new video. This step must
+            # never fail the job.
+            _maybe_record_video_metadata()
         else:
             # For a successful audio download, record a best-effort
             # ``metadata`` row so the library knows about the new MP3.
@@ -253,6 +257,55 @@ def _maybe_record_audio_metadata() -> None:
         )
     except Exception:  # pragma: no cover - defensive guard
         logger.exception("Recording audio download metadata raised; ignoring")
+
+
+def _maybe_record_video_metadata() -> None:
+    """Record a ``metadata`` row for the most recently produced MP4 in
+    ``VIDEO_DIR``.
+
+    Runs after a successful ``mode == "video"`` download, mirroring
+    :func:`_maybe_record_audio_metadata`. The yt-dlp output template is
+    ``<VIDEO_DIR>/%(title)s.%(ext)s`` and the downloader result dict does
+    not currently surface the produced file path, so we pick the newest
+    ``.mp4`` (by mtime) in the video directory and insert its filename,
+    absolute path, and size with ``content_type="video/mp4"``.
+
+    Best-effort and idempotent: a row is only inserted when no existing
+    ``metadata`` row already references the same absolute path, and any
+    error is swallowed and logged so a metadata problem can never turn a
+    completed download into a failed one.
+    """
+
+    try:
+        video_dir = Path(VIDEO_DIR)
+        if not video_dir.is_dir():
+            return
+        mp4s = sorted(video_dir.glob("*.mp4"), key=lambda p: p.stat().st_mtime)
+        if not mp4s:
+            return
+        produced = mp4s[-1]
+        resolved = str(produced.resolve())
+
+        database.init_db(METADATA_DB_PATH)
+        connection = database.get_connection(METADATA_DB_PATH)
+        try:
+            existing = connection.execute(
+                "SELECT 1 FROM metadata WHERE path = ?", (resolved,)
+            ).fetchone()
+        finally:
+            connection.close()
+        if existing is not None:
+            return
+
+        database.insert_metadata(
+            filename=produced.name,
+            path=resolved,
+            size=produced.stat().st_size,
+            content_type="video/mp4",
+            db_path=METADATA_DB_PATH,
+        )
+    except Exception:  # pragma: no cover - defensive guard
+        logger.exception("Recording video download metadata raised; ignoring")
 
 
 @router.post("/jobs/{job_id}/complete", response_model=JobResponse, tags=["Jobs"])
