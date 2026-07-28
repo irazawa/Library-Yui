@@ -163,4 +163,19 @@ a single `pytest` run (backend), `npm run build` (frontend), or
 - [x] Add a UNIQUE constraint on `(collection_id, metadata_id)` in the `collection_items` table in `init_db()` (with migration handling for pre-existing DBs) so duplicates are impossible at the DB layer, keeping the endpoint idempotent; add tests in `tests/test_database.py`.
 - [x] Add a `warning`-level log line (module logger) in `apps/api/app/jobs.py` when dual-write persistence fails (`_persist_job` / `_unpersist_job` swallow paths) so DB issues are visible without breaking the in-memory store; add a caplog test in `tests/test_jobs.py`.
 - [x] Add `docs/SCHEMA.md` documenting the SQLite schema (`metadata`, `tags`, `metadata_tags`, `jobs`, `collections`, `collection_items` — columns, constraints, relationships); verify with `git diff --check`.
-- [ ] Update `README.md` with a short Collections section (what they are, the `POST/GET /collections` + items endpoints, and how tags differ from collections); verify with `git diff --check`.
+- [x] Update `README.md` with a short Collections section (what they are, the `POST/GET /collections` + items endpoints, and how tags differ from collections); verify with `git diff --check`.
+
+## Next batch (generated 2026-07-28 via Gemini 3.5 Flash)
+
+MVP 5 expansion (Media Deletion, Storage Disk Breakdown, and System Config).
+Each task is small, self-contained, and verifiable with a single `pytest` run
+(backend), `npm run build` (frontend), or `git diff --check` (docs). Adapted to
+Library-Yui conventions.
+
+- [ ] Add `DELETE /library/audio/{name}` API endpoint in `apps/api/app/routes/library.py` to delete an MP3 file from `library/audio/` with path-traversal protection; add tests in `tests/test_library.py`.
+- [ ] Add `DELETE /library/video/{name}` API endpoint in `apps/api/app/routes/library.py` to delete an MP4 video file from `library/video/` and clean up thumbnail; add tests in `tests/test_library.py`.
+- [ ] Add delete button next to audio items in main web app Audio card (`apps/web/src/main.tsx`) calling `DELETE /library/audio/{name}`; verify with `npm run build` in `apps/web`.
+- [ ] Add delete button next to video items in main web app Video card (`apps/web/src/main.tsx`) calling `DELETE /library/video/{name}`; verify with `npm run build` in `apps/web`.
+- [ ] Add `GET /library/storage` API endpoint returning disk usage breakdown (bytes used per storage folder: audio, video, uploads, thumbnails); add tests in `tests/test_storage.py`.
+- [ ] Display storage usage card on the status dashboard (`apps/status/src/main.tsx`) fetched from `GET /library/storage`; verify with `npm run build` in `apps/status`.
+- [ ] Update `docs/API.md` documenting `DELETE /library/audio/{name}`, `DELETE /library/video/{name}`, and `GET /library/storage` endpoints; verify with `git diff --check`.

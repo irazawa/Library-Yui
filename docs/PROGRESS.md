@@ -543,3 +543,9 @@
 - Task: created `docs/SCHEMA.md` documenting the SQLite database schema (`metadata`, `tags`, `metadata_tags`, `collections`, `collection_items`, `jobs` tables — columns, constraints, data types, indexes, and relationships).
 - Verification: `git diff --check` (docs-only task) — clean.
 - Next small step: update `README.md` with a short Collections section.
+
+## 2026-07-28 SEAST — Slow Builder (README + plan refresh)
+
+- Task: updated `README.md` with a short Collections section detailing endpoints (`POST/GET /collections`, `POST/GET/DELETE /collections/{name}/items`) and explaining how Collections differ from Tags. Also generated the next batch of 7 tiny tasks for MVP 5 expansion (Media Deletion, Storage Breakdown, System Config) via Gemini 3.5 Flash (`agy`) and merged into `docs/plans/slow-tasks.md`.
+- Verification: `git diff --check` (docs-only task) — clean.
+- Next small step: add `DELETE /library/audio/{name}` API endpoint with path-traversal protection.
