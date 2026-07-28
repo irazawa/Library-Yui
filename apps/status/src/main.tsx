@@ -4,6 +4,7 @@ import './styles.css';
 
 const HEALTH_URL = 'http://127.0.0.1:8787/health';
 const JOBS_URL = 'http://127.0.0.1:8787/jobs';
+const JOBS_COMPLETED_URL = 'http://127.0.0.1:8787/jobs/completed';
 const STORAGE_URL = 'http://127.0.0.1:8787/library/storage';
 const GITHUB_URL = 'https://github.com/irazawa/Library-Yui';
 
@@ -108,6 +109,20 @@ function useJobs(intervalMs = 5000) {
   const [items, setItems] = useState<JobItem[]>([]);
   const [error, setError] = useState<string>('');
 
+  const fetchJobs = async () => {
+    try {
+      const res = await fetch(JOBS_URL);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json().catch(() => ({}));
+      const next = Array.isArray(data?.items) ? (data.items as JobItem[]) : [];
+      setItems(next);
+      setError('');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'unreachable';
+      setError(msg);
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
 
@@ -135,18 +150,45 @@ function useJobs(intervalMs = 5000) {
     };
   }, [intervalMs]);
 
-  return { items, error };
+  return { items, error, refetch: fetchJobs };
 }
 
 function JobsCard() {
-  const { items, error } = useJobs();
+  const { items, error, refetch } = useJobs();
+  const [clearing, setClearing] = useState(false);
+  const [clearError, setClearError] = useState('');
   const counts = countByStatus(items);
   const total = items.length;
   const active = counts.pending + counts.downloading;
+  const finished = counts.completed + counts.failed;
+
+  const handleClearCompleted = async () => {
+    setClearing(true);
+    setClearError('');
+    try {
+      const res = await fetch(JOBS_COMPLETED_URL, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await refetch();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to clear completed jobs';
+      setClearError(msg);
+    } finally {
+      setClearing(false);
+    }
+  };
 
   return (
     <article className="jobs-card">
-      <strong>Jobs</strong>
+      <div className="jobs-header">
+        <strong>Jobs</strong>
+        <button
+          className="jobs-clear-btn"
+          onClick={handleClearCompleted}
+          disabled={clearing || finished === 0}
+        >
+          {clearing ? 'Clearing…' : 'Clear completed jobs'}
+        </button>
+      </div>
       {error ? (
         <span className="jobs-error">Failed to load: {error}</span>
       ) : (
@@ -160,6 +202,7 @@ function JobsCard() {
             <li><span className="jobs-dot" data-status="completed" /> Completed: {counts.completed}</li>
             <li><span className="jobs-dot" data-status="failed" /> Failed: {counts.failed}</li>
           </ul>
+          {clearError ? <span className="jobs-clear-error">{clearError}</span> : null}
         </>
       )}
     </article>

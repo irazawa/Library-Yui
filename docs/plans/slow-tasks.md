@@ -186,7 +186,7 @@ Each task is small, self-contained, and verifiable with a single `pytest` run
 (backend), `npm run build` (frontend), or `git diff --check` (docs).
 
 - [x] Add `DELETE /jobs/completed` endpoint in `apps/api/app/routes/jobs.py` to clear all finished/failed jobs from the store; add tests in `tests/test_jobs.py`.
-- [ ] Add a "Clear completed jobs" button in the status dashboard (`apps/status/src/main.tsx`) calling `DELETE /jobs/completed`; verify with `npm run build` in `apps/status`.
+- [x] Add a "Clear completed jobs" button in the status dashboard (`apps/status/src/main.tsx`) calling `DELETE /jobs/completed`; verify with `npm run build` in `apps/status`.
 - [ ] Add search query parameter `?q=` filtering to `GET /library/audio` and `GET /library/video` endpoints in `apps/api/app/routes/library.py`; add tests in `tests/test_library.py`.
 - [ ] Add search inputs to the Audio and Video cards in the main web app (`apps/web/src/main.tsx`) filtering the items via `?q=`; verify with `npm run build` in `apps/web`.
 - [ ] Expand Collections card in main web app (`apps/web/src/main.tsx`) to show items inside an expanded collection fetched from `GET /collections/{name}/items`; verify with `npm run build` in `apps/web`.

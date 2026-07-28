@@ -574,3 +574,10 @@
 - Verification: `cd apps/api && .\.venv\Scripts\python -m pytest` — 212 passed.
 - Next small step: display storage usage card on the status dashboard (`apps/status/src/main.tsx`) fetched from `GET /library/storage`.
 
+## 2026-07-29 06:03 SEAST — Slow Builder (Clear Completed Jobs Button in Status Dashboard)
+
+- Task: added a "Clear completed jobs" button to the Jobs card in the status dashboard (`apps/status/src/main.tsx` + `styles.css`) calling `DELETE /jobs/completed`, displaying button state (`Clearing…`, disabled when no finished/failed jobs), error feedback, and triggering a list refetch on success.
+- Verification: `cd apps/status && npm run build` — clean build (0 errors, 15 modules transformed); `cd apps/api && .\.venv\Scripts\python -m pytest` — 215 passed.
+- Next small step: add search query parameter `?q=` filtering to `GET /library/audio` and `GET /library/video` endpoints in `apps/api/app/routes/library.py`.
+
+
