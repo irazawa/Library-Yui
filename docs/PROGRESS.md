@@ -562,5 +562,8 @@
 
 - Task: added delete button next to audio items in main web app Audio card (`apps/web/src/main.tsx`) calling `DELETE /library/audio/{name}` with error banner notice on failure and automatic list refresh + active player track cleanup on success; updated `apps/web/src/styles.css` with `.audio-delete` button styling and responsive `.audio-name` flex layout.
 - Verification: `cd apps/web && npm run build` — clean build (0 errors, 15 modules transformed).
-- Next small step: add delete button next to video items in main web app Video card (`apps/web/src/main.tsx`) calling `DELETE /library/video/{name}`.
+## 2026-07-29 01:03 SEAST — Slow Builder (Delete Video Button in Web App)
 
+- Task: added delete button next to video items in main web app Video card (`apps/web/src/main.tsx`) calling `DELETE /library/video/{name}` with error banner notice on failure, `videoRefreshKey` state + `useLibraryVideo` refreshKey parameter for list refresh, and active video preview cleanup on success; updated `apps/web/src/styles.css` with `.video-delete` button styling and `.video-name` flex layout.
+- Verification: `cd apps/web && npm run build` — clean build (0 errors, 15 modules transformed); `cd apps/api && .\.venv\Scripts\python -m pytest` — 209 passed.
+- Next small step: add `GET /library/storage` API endpoint returning disk usage breakdown.

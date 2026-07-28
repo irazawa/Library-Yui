@@ -213,7 +213,7 @@ function useLibraryAudio(refreshKey: number = 0) {
  * Fetch the list of MP4 files in the video library via `GET /library/video`.
  * Returns the list of video items plus a loading flag.
  */
-function useLibraryVideo() {
+function useLibraryVideo(refreshKey: number = 0) {
   const [items, setItems] = useState<VideoItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -238,7 +238,7 @@ function useLibraryVideo() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshKey]);
 
   return { items, loading };
 }
@@ -626,7 +626,8 @@ function App() {
   const { state, summary } = useLibrarySummary();
   const [audioRefreshKey, setAudioRefreshKey] = useState(0);
   const { items: audioItems, loading: audioLoading } = useLibraryAudio(audioRefreshKey);
-  const { items: videoItems, loading: videoLoading } = useLibraryVideo();
+  const [videoRefreshKey, setVideoRefreshKey] = useState(0);
+  const { items: videoItems, loading: videoLoading } = useLibraryVideo(videoRefreshKey);
   const [collectionsRefreshKey, setCollectionsRefreshKey] = useState(0);
   const { items: collectionItems, loading: collectionsLoading } =
     useCollections(collectionsRefreshKey);
@@ -715,6 +716,22 @@ function App() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Delete audio failed';
       setNotice(`Could not delete audio item "${name}": ${msg}`);
+    }
+  }
+
+  async function handleDeleteVideo(name: string) {
+    try {
+      const res = await fetch(`${LIBRARY_VIDEO_URL}/${encodeURIComponent(name)}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (activeVideo?.name === name) {
+        setActiveVideo(null);
+      }
+      setVideoRefreshKey((k) => k + 1);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Delete video failed';
+      setNotice(`Could not delete video item "${name}": ${msg}`);
     }
   }
 
@@ -994,6 +1011,14 @@ function App() {
                     ▶
                   </button>
                   <span className="video-name">{item.name}</span>
+                  <button
+                    type="button"
+                    className="video-delete"
+                    onClick={() => handleDeleteVideo(item.name)}
+                    aria-label={`Delete ${item.name}`}
+                  >
+                    ✕
+                  </button>
                 </li>
               ))}
             </ul>
