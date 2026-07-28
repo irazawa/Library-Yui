@@ -177,5 +177,20 @@ Library-Yui conventions.
 - [x] Add delete button next to audio items in main web app Audio card (`apps/web/src/main.tsx`) calling `DELETE /library/audio/{name}`; verify with `npm run build` in `apps/web`.
 - [x] Add delete button next to video items in main web app Video card (`apps/web/src/main.tsx`) calling `DELETE /library/video/{name}`; verify with `npm run build` in `apps/web`.
 - [x] Add `GET /library/storage` API endpoint returning disk usage breakdown (bytes used per storage folder: audio, video, uploads, thumbnails); add tests in `tests/test_storage.py`.
-- [x] Display storage usage card on the status dashboard (`apps/status/src/main.tsx`) fetched from `GET /library/storage`; verify with `npm run build` in `apps/status`.
-- [ ] Update `docs/API.md` documenting `DELETE /library/audio/{name}`, `DELETE /library/video/{name}`, and `GET /library/storage` endpoints; verify with `git diff --check`.
+- [x] Update `docs/API.md` documenting `DELETE /library/audio/{name}`, `DELETE /library/video/{name}`, and `GET /library/storage` endpoints; verify with `git diff --check`.
+
+## Next batch (generated 2026-07-29 via Gemini 3.5 Flash)
+
+MVP 6 (Collections UI Deepening, Library Search, & System Utilities).
+Each task is small, self-contained, and verifiable with a single `pytest` run
+(backend), `npm run build` (frontend), or `git diff --check` (docs).
+
+- [ ] Add `DELETE /jobs/completed` endpoint in `apps/api/app/routes/jobs.py` to clear all finished/failed jobs from the store; add tests in `tests/test_jobs.py`.
+- [ ] Add a "Clear completed jobs" button in the status dashboard (`apps/status/src/main.tsx`) calling `DELETE /jobs/completed`; verify with `npm run build` in `apps/status`.
+- [ ] Add search query parameter `?q=` filtering to `GET /library/audio` and `GET /library/video` endpoints in `apps/api/app/routes/library.py`; add tests in `tests/test_library.py`.
+- [ ] Add search inputs to the Audio and Video cards in the main web app (`apps/web/src/main.tsx`) filtering the items via `?q=`; verify with `npm run build` in `apps/web`.
+- [ ] Expand Collections card in main web app (`apps/web/src/main.tsx`) to show items inside an expanded collection fetched from `GET /collections/{name}/items`; verify with `npm run build` in `apps/web`.
+- [ ] Add a remove button for collection items in main web app calling `DELETE /collections/{name}/items/{metadata_id}`; verify with `npm run build` in `apps/web`.
+- [ ] Add `GET /library/export` endpoint in `apps/api/app/routes/library.py` returning a JSON dump of all metadata, tags, collections, and jobs; add tests in `tests/test_library.py`.
+- [ ] Update `docs/API.md` documenting `DELETE /jobs/completed`, `GET /library/export`, and `?q=` search params on audio/video endpoints; verify with `git diff --check`.
+

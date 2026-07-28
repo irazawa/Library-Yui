@@ -11,7 +11,7 @@ as sections in the interactive docs (`/docs`, `/redoc`):
 | ------------- | ---------------------------------------------------------------------- |
 | `System`      | Liveness probes, version, and runtime config (`/health`, `/version`, `/config`). |
 | `Jobs`        | Download job lifecycle (`/jobs`, `/jobs/{id}`, `/jobs/{id}/start`, `/jobs/{id}/complete`, `DELETE /jobs/{id}`). |
-| `Library`     | Library listing, streaming, uploads, thumbnails, and summary.          |
+| `Library`     | Library listing, streaming, audio/video deletion, uploads, thumbnails, storage usage, and summary. |
 | `Collections` | Tags, per-item metadata, and metadata deletion (tag assignment, search filters, metadata detail, `DELETE /library/metadata/{id}`). |
 
 ## `GET /health`
@@ -129,6 +129,35 @@ Missing directories count as `0`, so this works before any downloads/uploads exi
 curl http://127.0.0.1:8787/library/summary
 ```
 
+## `GET /library/storage`
+
+Returns total bytes used per storage folder (`audio`, `video`, `uploads`, `thumbnails`).
+Missing directories count as `0` bytes, so this works before any downloads/uploads exist.
+
+### Response — `200 OK`
+
+```json
+{
+  "audio": 0,
+  "video": 0,
+  "uploads": 0,
+  "thumbnails": 0
+}
+```
+
+| Field        | Type | Description                                         |
+| ------------ | ---- | --------------------------------------------------- |
+| `audio`      | int  | Total bytes used by files in the audio folder.      |
+| `video`      | int  | Total bytes used by files in the video folder.      |
+| `uploads`    | int  | Total bytes used by files in the uploads folder.    |
+| `thumbnails` | int  | Total bytes used by files in the thumbnails folder. |
+
+### Example
+
+```bash
+curl http://127.0.0.1:8787/library/storage
+```
+
 ## `GET /library/audio`
 
 Returns the names of MP3 files in the audio library folder, sorted alphabetically.
@@ -160,6 +189,41 @@ when present; `null` otherwise — never raises).
 
 ```bash
 curl http://127.0.0.1:8787/library/audio
+```
+
+## `DELETE /library/audio/{name}`
+
+Deletes a single `.mp3` file from the audio library folder (`library/audio/`).
+
+The endpoint only deletes files directly inside `library/audio/`. Path-traversal
+attempts (e.g. `../`, leading slashes, backslash separators, or nested
+subdirectories) and non-`.mp3` names all resolve to a uniform `404` error.
+
+### Path parameters
+
+| Parameter | Type   | Description                             |
+| --------- | ------ | --------------------------------------- |
+| `name`    | string | The `.mp3` file name to delete (no path). |
+
+### Response — `204 No Content`
+
+Empty body. The file has been deleted.
+
+### Response — `404 Not Found`
+
+Returned when the file is missing, the name is not a `.mp3`, or the resolved
+path escapes `library/audio`.
+
+```json
+{
+  "detail": "Audio not found"
+}
+```
+
+### Example
+
+```bash
+curl -X DELETE http://127.0.0.1:8787/library/audio/song.mp3
 ```
 
 ## `GET /library/video/{name}`
@@ -203,6 +267,42 @@ curl -o clip.mp4 http://127.0.0.1:8787/library/video/clip.mp4
 
 # Stream it into an HTML5 player
 # <video src="http://127.0.0.1:8787/library/video/clip.mp4" controls></video>
+```
+
+## `DELETE /library/video/{name}`
+
+Deletes a single `.mp4` file from the video library folder (`library/video/`) and
+best-effort cleans up its associated `.jpg` thumbnail in `library/thumbnails/`.
+
+The endpoint only deletes files directly inside `library/video/`. Path-traversal
+attempts (e.g. `../`, leading slashes, backslash separators, or nested
+subdirectories) and non-`.mp4` names all resolve to a uniform `404` error.
+
+### Path parameters
+
+| Parameter | Type   | Description                             |
+| --------- | ------ | --------------------------------------- |
+| `name`    | string | The `.mp4` file name to delete (no path). |
+
+### Response — `204 No Content`
+
+Empty body. The video file and its thumbnail (if present) have been deleted.
+
+### Response — `404 Not Found`
+
+Returned when the file is missing, the name is not a `.mp4`, or the resolved
+path escapes `library/video`.
+
+```json
+{
+  "detail": "Video not found"
+}
+```
+
+### Example
+
+```bash
+curl -X DELETE http://127.0.0.1:8787/library/video/clip.mp4
 ```
 
 ## `POST /jobs`
