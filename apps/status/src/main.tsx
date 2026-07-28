@@ -4,6 +4,7 @@ import './styles.css';
 
 const HEALTH_URL = 'http://127.0.0.1:8787/health';
 const JOBS_URL = 'http://127.0.0.1:8787/jobs';
+const STORAGE_URL = 'http://127.0.0.1:8787/library/storage';
 const GITHUB_URL = 'https://github.com/irazawa/Library-Yui';
 
 type JobStatus = 'pending' | 'downloading' | 'completed' | 'failed';
@@ -11,6 +12,83 @@ interface JobItem {
   id: string;
   url: string;
   status: JobStatus;
+}
+
+interface StorageData {
+  audio: number;
+  video: number;
+  uploads: number;
+  thumbnails: number;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  const val = bytes / Math.pow(k, i);
+  return `${val.toFixed(i === 0 ? 0 : 1)} ${sizes[i]}`;
+}
+
+function useStorage(intervalMs = 5000) {
+  const [data, setData] = useState<StorageData | null>(null);
+  const [error, setError] = useState<string>('');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function poll() {
+      try {
+        const res = await fetch(STORAGE_URL);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        if (cancelled) return;
+        setData(json);
+        setError('');
+      } catch (err) {
+        if (cancelled) return;
+        const msg = err instanceof Error ? err.message : 'unreachable';
+        setError(msg);
+      }
+    }
+
+    poll();
+    const timer = window.setInterval(poll, intervalMs);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [intervalMs]);
+
+  return { data, error };
+}
+
+function StorageCard() {
+  const { data, error } = useStorage();
+  const total = data ? data.audio + data.video + data.uploads + data.thumbnails : 0;
+
+  return (
+    <article className="storage-card">
+      <strong>Storage Usage</strong>
+      {error ? (
+        <span className="storage-error">Failed to load: {error}</span>
+      ) : !data ? (
+        <span className="storage-loading">Loading...</span>
+      ) : (
+        <>
+          <span className="storage-total">
+            Total: {formatBytes(total)}
+          </span>
+          <ul className="storage-breakdown">
+            <li>Audio: {formatBytes(data.audio)}</li>
+            <li>Video: {formatBytes(data.video)}</li>
+            <li>Uploads: {formatBytes(data.uploads)}</li>
+            <li>Thumbnails: {formatBytes(data.thumbnails)}</li>
+          </ul>
+        </>
+      )}
+    </article>
+  );
 }
 
 function countByStatus(items: JobItem[]): Record<JobStatus, number> {
@@ -168,6 +246,7 @@ function App() {
       <section className="grid">
         <HealthCard />
         <JobsCard />
+        <StorageCard />
         <GithubCard />
         {roadmap.map(([title, text]) => (
           <article key={title}>
