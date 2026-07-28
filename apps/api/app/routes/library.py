@@ -32,6 +32,13 @@ class LibrarySummaryResponse(BaseModel):
     thumbnails: int
 
 
+class StorageUsageResponse(BaseModel):
+    audio: int
+    video: int
+    uploads: int
+    thumbnails: int
+
+
 class AudioItem(BaseModel):
     name: str
     size: int
@@ -115,6 +122,30 @@ def _count_files(directory: Path) -> int:
     if not directory.is_dir():
         return 0
     return sum(1 for entry in directory.iterdir() if entry.is_file())
+
+
+def _dir_size_bytes(directory: Path) -> int:
+    """Sum total file sizes (bytes) directly inside a storage directory.
+
+    Missing directories count as 0 so the endpoint works before any
+    downloads/uploads have happened.
+    """
+
+    if not directory.is_dir():
+        return 0
+    total = 0
+    try:
+        entries = list(directory.iterdir())
+    except OSError:
+        return 0
+
+    for entry in entries:
+        try:
+            if entry.is_file():
+                total += entry.stat().st_size
+        except OSError:
+            pass
+    return total
 
 
 def _payload_too_large() -> HTTPException:
@@ -239,6 +270,18 @@ def _find_top_level_box(fh, target: bytes) -> tuple[int, int] | None:
 def get_library_summary() -> LibrarySummaryResponse:
     counts = {name: _count_files(path) for name, path in STORAGE_DIRS.items()}
     return LibrarySummaryResponse(**counts)
+
+
+@router.get("/library/storage", response_model=StorageUsageResponse, tags=["Library"])
+def get_library_storage() -> StorageUsageResponse:
+    """Return total bytes used per storage folder (audio, video, uploads, thumbnails).
+
+    Missing directories return 0 bytes so the endpoint works before any
+    downloads/uploads have happened.
+    """
+
+    sizes = {name: _dir_size_bytes(path) for name, path in STORAGE_DIRS.items()}
+    return StorageUsageResponse(**sizes)
 
 
 @router.get("/library/audio", response_model=AudioListResponse, tags=["Library"])

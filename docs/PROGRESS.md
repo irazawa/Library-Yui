@@ -567,3 +567,10 @@
 - Task: added delete button next to video items in main web app Video card (`apps/web/src/main.tsx`) calling `DELETE /library/video/{name}` with error banner notice on failure, `videoRefreshKey` state + `useLibraryVideo` refreshKey parameter for list refresh, and active video preview cleanup on success; updated `apps/web/src/styles.css` with `.video-delete` button styling and `.video-name` flex layout.
 - Verification: `cd apps/web && npm run build` — clean build (0 errors, 15 modules transformed); `cd apps/api && .\.venv\Scripts\python -m pytest` — 209 passed.
 - Next small step: add `GET /library/storage` API endpoint returning disk usage breakdown.
+
+## 2026-07-29 02:03 SEAST — Slow Builder (GET /library/storage)
+
+- Task: added `GET /library/storage` API endpoint in `apps/api/app/routes/library.py` returning disk usage breakdown (bytes used per storage folder: `audio`, `video`, `uploads`, `thumbnails`), backed by `_dir_size_bytes()` helper calculating total file sizes and ignoring missing directories/subdirectories; added unit tests in `apps/api/tests/test_storage.py` (structure verification, exact size calculation, missing dir handling).
+- Verification: `cd apps/api && .\.venv\Scripts\python -m pytest` — 212 passed.
+- Next small step: display storage usage card on the status dashboard (`apps/status/src/main.tsx`) fetched from `GET /library/storage`.
+
