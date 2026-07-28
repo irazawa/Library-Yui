@@ -412,6 +412,97 @@ def test_delete_audio_blocks_path_traversal(monkeypatch, tmp_path):
         assert secret_file.exists()
 
 
+def test_delete_video_deletes_existing_mp4_and_thumbnail(monkeypatch, tmp_path):
+    """DELETE /library/video/{name} removes the .mp4 file and thumbnail, returns 204."""
+
+    fake_video = tmp_path / "video"
+    fake_video.mkdir()
+    video_file = fake_video / "clip.mp4"
+    video_file.write_bytes(b"video data")
+
+    fake_thumbs = tmp_path / "thumbnails"
+    fake_thumbs.mkdir()
+    thumb_file = fake_thumbs / "clip.jpg"
+    thumb_file.write_bytes(b"jpeg data")
+
+    monkeypatch.setattr(library_route, "VIDEO_DIR", fake_video)
+    monkeypatch.setattr(library_route, "THUMBNAILS_DIR", fake_thumbs)
+
+    response = client.delete("/library/video/clip.mp4")
+
+    assert response.status_code == 204
+    assert response.content == b""
+    assert not video_file.exists()
+    assert not thumb_file.exists()
+
+
+def test_delete_video_succeeds_without_thumbnail(monkeypatch, tmp_path):
+    """DELETE /library/video/{name} succeeds when thumbnail does not exist."""
+
+    fake_video = tmp_path / "video"
+    fake_video.mkdir()
+    video_file = fake_video / "clip.mp4"
+    video_file.write_bytes(b"video data")
+
+    fake_thumbs = tmp_path / "thumbnails"
+    fake_thumbs.mkdir()
+
+    monkeypatch.setattr(library_route, "VIDEO_DIR", fake_video)
+    monkeypatch.setattr(library_route, "THUMBNAILS_DIR", fake_thumbs)
+
+    response = client.delete("/library/video/clip.mp4")
+
+    assert response.status_code == 204
+    assert not video_file.exists()
+
+
+def test_delete_video_returns_404_for_missing_file(monkeypatch, tmp_path):
+    """DELETE /library/video/{name} 404s when the file does not exist."""
+
+    fake_video = tmp_path / "video"
+    fake_video.mkdir()
+
+    monkeypatch.setattr(library_route, "VIDEO_DIR", fake_video)
+
+    response = client.delete("/library/video/missing.mp4")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Video not found"
+
+
+def test_delete_video_returns_404_for_non_mp4(monkeypatch, tmp_path):
+    """DELETE /library/video/{name} 404s when the file is not a .mp4."""
+
+    fake_video = tmp_path / "video"
+    fake_video.mkdir()
+    notes_file = fake_video / "notes.txt"
+    notes_file.write_bytes(b"hi")
+
+    monkeypatch.setattr(library_route, "VIDEO_DIR", fake_video)
+
+    response = client.delete("/library/video/notes.txt")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Video not found"
+    assert notes_file.exists()
+
+
+def test_delete_video_blocks_path_traversal(monkeypatch, tmp_path):
+    """DELETE /library/video/{name} never deletes files outside the video dir."""
+
+    fake_video = tmp_path / "video"
+    fake_video.mkdir()
+    secret_file = tmp_path / "secret.mp4"
+    secret_file.write_bytes(b"sensitive")
+
+    monkeypatch.setattr(library_route, "VIDEO_DIR", fake_video)
+
+    for bad in ("../secret.mp4", "..\\secret.mp4", "/etc/passwd", "sub/clip.mp4"):
+        response = client.delete(f"/library/video/{bad}")
+        assert response.status_code == 404, bad
+        assert secret_file.exists()
+
+
 def test_library_thumbnail_by_name_serves_existing_jpg(monkeypatch, tmp_path):
     """GET /library/thumbnails/{name} serves an existing .jpg file body."""
 

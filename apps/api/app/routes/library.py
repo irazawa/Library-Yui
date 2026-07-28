@@ -348,6 +348,38 @@ def stream_video(name: str):
     return FileResponse(target, media_type="video/mp4")
 
 
+@router.delete(
+    "/library/video/{name}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["Library"],
+)
+def delete_video(name: str) -> None:
+    """Delete a single ``.mp4`` file from ``library/video`` and clean up its thumbnail.
+
+    Returns 204 No Content on success. Returns 404 for missing files,
+    non-.mp4 names, or any path that escapes the video directory.
+    Best-effort cleanup removes the associated ``.jpg`` thumbnail from
+    ``library/thumbnails`` if present.
+    """
+
+    target = _resolve_video_file(name)
+    if target is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Video not found",
+        )
+    target.unlink()
+
+    thumb_path = _resolve_thumbnail_file(f"{target.stem}.jpg")
+    if thumb_path is not None:
+        try:
+            thumb_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+    return None
+
+
 def _resolve_audio_file(name: str) -> Path | None:
     """Resolve ``name`` to a real .mp3 file inside ``AUDIO_DIR``.
 
