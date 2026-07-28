@@ -1309,3 +1309,85 @@ def list_jobs_mod_list():
     from app.jobs import list_jobs
 
     return list_jobs()
+
+
+# ---------------------------------------------------------------------------
+# DELETE /jobs/completed & delete_completed_jobs() tests
+# ---------------------------------------------------------------------------
+
+def test_delete_completed_jobs_clears_completed_and_failed_jobs() -> None:
+    """delete_completed_jobs() removes only completed and failed jobs."""
+
+    from app.jobs import create_job, delete_completed_jobs, update_job_status
+
+    j_pending = create_job("https://youtu.be/pending1111")
+    j_downloading = create_job("https://youtu.be/download222")
+    update_job_status(j_downloading["id"], "downloading")
+
+    j_completed = create_job("https://youtu.be/completed33")
+    update_job_status(j_completed["id"], "completed")
+
+    j_failed = create_job("https://youtu.be/failed44444")
+    update_job_status(j_failed["id"], "failed")
+
+    removed_count = delete_completed_jobs()
+    assert removed_count == 2
+
+    remaining = [j["id"] for j in list_jobs_mod_list()]
+    assert j_pending["id"] in remaining
+    assert j_downloading["id"] in remaining
+    assert j_completed["id"] not in remaining
+    assert j_failed["id"] not in remaining
+
+
+def test_delete_completed_jobs_api_endpoint() -> None:
+    """DELETE /jobs/completed returns 200 with count of deleted jobs."""
+
+    client = TestClient(app)
+
+    # Create 4 jobs: pending, downloading, completed, failed
+    j1 = client.post("/jobs", json={"url": "https://youtu.be/video111111"}).json()
+    j2 = client.post("/jobs", json={"url": "https://youtu.be/video222222"}).json()
+    client.post(f"/jobs/{j2['id']}/start")
+
+    j3 = client.post("/jobs", json={"url": "https://youtu.be/video333333"}).json()
+    client.post(f"/jobs/{j3['id']}/complete")
+
+    j4 = client.post("/jobs", json={"url": "https://youtu.be/video444444"}).json()
+    jobs_mod.update_job_status(j4["id"], "failed")
+
+    res = client.delete("/jobs/completed")
+    assert res.status_code == 200
+    assert res.json() == {"count": 2}
+
+    items = client.get("/jobs").json()["items"]
+    ids = [item["id"] for item in items]
+    assert j1["id"] in ids
+    assert j2["id"] in ids
+    assert j3["id"] not in ids
+    assert j4["id"] not in ids
+
+
+def test_delete_completed_jobs_api_endpoint_removes_persisted_sqlite_rows(tmp_path) -> None:
+    """DELETE /jobs/completed removes completed/failed jobs from SQLite."""
+
+    db_path = tmp_path / "library.db"
+    set_jobs_db_path(db_path)
+    try:
+        client = TestClient(app)
+
+        j1 = client.post("/jobs", json={"url": "https://youtu.be/video111111"}).json()
+        j2 = client.post("/jobs", json={"url": "https://youtu.be/video222222"}).json()
+        client.post(f"/jobs/{j2['id']}/complete")
+
+        assert len(_read_job_rows(db_path)) == 2
+
+        res = client.delete("/jobs/completed")
+        assert res.status_code == 200
+        assert res.json() == {"count": 1}
+
+        rows = _read_job_rows(db_path)
+        assert len(rows) == 1
+        assert rows[0]["id"] == j1["id"]
+    finally:
+        set_jobs_db_path(database.DEFAULT_DB_PATH)

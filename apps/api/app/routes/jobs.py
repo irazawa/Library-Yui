@@ -13,7 +13,14 @@ from app.downloader import (
     extract_thumbnail,
     is_downloads_enabled,
 )
-from app.jobs import create_job, delete_job, get_job, list_jobs, update_job_status
+from app.jobs import (
+    create_job,
+    delete_completed_jobs,
+    delete_job,
+    get_job,
+    list_jobs,
+    update_job_status,
+)
 from app.storage import AUDIO_DIR, VIDEO_DIR
 
 logger = logging.getLogger(__name__)
@@ -43,6 +50,11 @@ class JobResponse(BaseModel):
 
 class JobListResponse(BaseModel):
     items: list[JobResponse]
+
+
+class JobClearResponse(BaseModel):
+    count: int
+
 
 
 def _is_youtube_url(url: str) -> bool:
@@ -326,6 +338,21 @@ def complete_download_job(job_id: str) -> JobResponse:
         if updated is not None:
             return JobResponse(**updated)
     return JobResponse(**job)
+
+
+@router.delete(
+    "/jobs/completed",
+    response_model=JobClearResponse,
+    tags=["Jobs"],
+)
+def clear_completed_jobs() -> JobClearResponse:
+    """Clear all finished ('completed') or failed ('failed') jobs from the store.
+
+    Returns the count of removed jobs.
+    """
+
+    count = delete_completed_jobs()
+    return JobClearResponse(count=count)
 
 
 @router.delete(

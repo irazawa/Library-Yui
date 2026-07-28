@@ -186,6 +186,23 @@ def delete_job(job_id: str) -> bool:
     return existed
 
 
+def delete_completed_jobs() -> int:
+    """Remove all jobs with status 'completed' or 'failed' from the store.
+
+    Returns the number of jobs removed. SQLite rows are also removed
+    best-effort via :func:`delete_job`.
+    """
+
+    to_delete = [
+        job_id for job_id, job in list(_JOBS.items())
+        if job["status"] in ("completed", "failed")
+    ]
+    for job_id in to_delete:
+        delete_job(job_id)
+    return len(to_delete)
+
+
+
 def load_jobs_from_db(db_path: object | None = None) -> int:
     """Hydrate the in-memory job store from the SQLite ``jobs`` table.
 
