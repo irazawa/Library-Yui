@@ -402,6 +402,28 @@ def stream_audio(name: str):
     return FileResponse(target, media_type="audio/mpeg")
 
 
+@router.delete(
+    "/library/audio/{name}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["Library"],
+)
+def delete_audio(name: str) -> None:
+    """Delete a single ``.mp3`` file from ``library/audio``.
+
+    Returns 204 No Content on success. Returns 404 for missing files,
+    non-.mp3 names, or any path that escapes the audio directory.
+    """
+
+    target = _resolve_audio_file(name)
+    if target is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Audio not found",
+        )
+    target.unlink()
+    return None
+
+
 def _resolve_thumbnail_file(name: str) -> Path | None:
     """Resolve ``name`` to a real .jpg file inside ``THUMBNAILS_DIR``.
 

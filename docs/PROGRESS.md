@@ -548,4 +548,8 @@
 
 - Task: updated `README.md` with a short Collections section detailing endpoints (`POST/GET /collections`, `POST/GET/DELETE /collections/{name}/items`) and explaining how Collections differ from Tags. Also generated the next batch of 7 tiny tasks for MVP 5 expansion (Media Deletion, Storage Breakdown, System Config) via Gemini 3.5 Flash (`agy`) and merged into `docs/plans/slow-tasks.md`.
 - Verification: `git diff --check` (docs-only task) — clean.
-- Next small step: add `DELETE /library/audio/{name}` API endpoint with path-traversal protection.
+## 2026-07-28 22:01 SEAST — Slow Builder (DELETE /library/audio/{name})
+
+- Task: added `DELETE /library/audio/{name}` API endpoint in `apps/api/app/routes/library.py` to delete an MP3 file from `library/audio/` with path-traversal protection (`_resolve_audio_file`), returning 204 No Content on success or 404 for missing/invalid/path-escaping files; added unit test coverage in `tests/test_library.py` (file removal, missing file 404, non-mp3 404, path traversal blocking).
+- Verification: `cd apps/api && .venv/Scripts/python -m pytest` — 204 passed.
+- Next small step: add `DELETE /library/video/{name}` API endpoint in `apps/api/app/routes/library.py` to delete an MP4 video file and clean up its thumbnail.

@@ -172,7 +172,7 @@ Each task is small, self-contained, and verifiable with a single `pytest` run
 (backend), `npm run build` (frontend), or `git diff --check` (docs). Adapted to
 Library-Yui conventions.
 
-- [ ] Add `DELETE /library/audio/{name}` API endpoint in `apps/api/app/routes/library.py` to delete an MP3 file from `library/audio/` with path-traversal protection; add tests in `tests/test_library.py`.
+- [x] Add `DELETE /library/audio/{name}` API endpoint in `apps/api/app/routes/library.py` to delete an MP3 file from `library/audio/` with path-traversal protection; add tests in `tests/test_library.py`.
 - [ ] Add `DELETE /library/video/{name}` API endpoint in `apps/api/app/routes/library.py` to delete an MP4 video file from `library/video/` and clean up thumbnail; add tests in `tests/test_library.py`.
 - [ ] Add delete button next to audio items in main web app Audio card (`apps/web/src/main.tsx`) calling `DELETE /library/audio/{name}`; verify with `npm run build` in `apps/web`.
 - [ ] Add delete button next to video items in main web app Video card (`apps/web/src/main.tsx`) calling `DELETE /library/video/{name}`; verify with `npm run build` in `apps/web`.

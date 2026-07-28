@@ -348,6 +348,70 @@ def test_library_audio_by_name_blocks_path_traversal(monkeypatch, tmp_path):
         assert b"sensitive" not in response.content
 
 
+def test_delete_audio_deletes_existing_mp3(monkeypatch, tmp_path):
+    """DELETE /library/audio/{name} removes the .mp3 file and returns 204."""
+
+    fake_audio = tmp_path / "audio"
+    fake_audio.mkdir()
+    audio_file = fake_audio / "track.mp3"
+    audio_file.write_bytes(b"audio data")
+
+    monkeypatch.setattr(library_route, "AUDIO_DIR", fake_audio)
+
+    response = client.delete("/library/audio/track.mp3")
+
+    assert response.status_code == 204
+    assert response.content == b""
+    assert not audio_file.exists()
+
+
+def test_delete_audio_returns_404_for_missing_file(monkeypatch, tmp_path):
+    """DELETE /library/audio/{name} 404s when the file does not exist."""
+
+    fake_audio = tmp_path / "audio"
+    fake_audio.mkdir()
+
+    monkeypatch.setattr(library_route, "AUDIO_DIR", fake_audio)
+
+    response = client.delete("/library/audio/missing.mp3")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Audio not found"
+
+
+def test_delete_audio_returns_404_for_non_mp3(monkeypatch, tmp_path):
+    """DELETE /library/audio/{name} 404s when the file is not a .mp3."""
+
+    fake_audio = tmp_path / "audio"
+    fake_audio.mkdir()
+    notes_file = fake_audio / "notes.txt"
+    notes_file.write_bytes(b"hi")
+
+    monkeypatch.setattr(library_route, "AUDIO_DIR", fake_audio)
+
+    response = client.delete("/library/audio/notes.txt")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Audio not found"
+    assert notes_file.exists()
+
+
+def test_delete_audio_blocks_path_traversal(monkeypatch, tmp_path):
+    """DELETE /library/audio/{name} never deletes files outside the audio dir."""
+
+    fake_audio = tmp_path / "audio"
+    fake_audio.mkdir()
+    secret_file = tmp_path / "secret.mp3"
+    secret_file.write_bytes(b"sensitive")
+
+    monkeypatch.setattr(library_route, "AUDIO_DIR", fake_audio)
+
+    for bad in ("../secret.mp3", "..\\secret.mp3", "/etc/passwd", "sub/track.mp3"):
+        response = client.delete(f"/library/audio/{bad}")
+        assert response.status_code == 404, bad
+        assert secret_file.exists()
+
+
 def test_library_thumbnail_by_name_serves_existing_jpg(monkeypatch, tmp_path):
     """GET /library/thumbnails/{name} serves an existing .jpg file body."""
 
