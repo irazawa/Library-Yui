@@ -537,3 +537,9 @@
 - Task: added caplog test coverage for the dual-write persistence warning logs in `apps/api/app/jobs.py` — `tests/test_jobs.py` now verifies `_persist_job` failures log "Job persistence failed", `_unpersist_job` failures log "Job unpersist failed" (with the in-memory store unaffected in both cases), and a missing `jobs` table stays a quiet no-op. The warning log lines themselves already existed in `jobs.py`, so this task was test-only.
 - Verification: `cd apps/api && PYTHONPATH= PYTHONNOUSERSITE=1 .venv/Scripts/python -m pytest tests/test_health.py tests/test_jobs.py -q` — 51 passed.
 - Next small step: add `docs/SCHEMA.md` documenting the SQLite schema.
+
+## 2026-07-28 SEAST — Slow Builder
+
+- Task: created `docs/SCHEMA.md` documenting the SQLite database schema (`metadata`, `tags`, `metadata_tags`, `collections`, `collection_items`, `jobs` tables — columns, constraints, data types, indexes, and relationships).
+- Verification: `git diff --check` (docs-only task) — clean.
+- Next small step: update `README.md` with a short Collections section.
