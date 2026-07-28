@@ -179,7 +179,7 @@ function useLibrarySummary() {
  * Fetch the list of MP3 files in the audio library via `GET /library/audio`.
  * Returns the list of audio items plus a loading flag.
  */
-function useLibraryAudio() {
+function useLibraryAudio(refreshKey: number = 0) {
   const [items, setItems] = useState<AudioItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -204,7 +204,7 @@ function useLibraryAudio() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshKey]);
 
   return { items, loading };
 }
@@ -624,7 +624,8 @@ function AudioPlayerBar({ track, onClose }: AudioPlayerBarProps) {
 
 function App() {
   const { state, summary } = useLibrarySummary();
-  const { items: audioItems, loading: audioLoading } = useLibraryAudio();
+  const [audioRefreshKey, setAudioRefreshKey] = useState(0);
+  const { items: audioItems, loading: audioLoading } = useLibraryAudio(audioRefreshKey);
   const { items: videoItems, loading: videoLoading } = useLibraryVideo();
   const [collectionsRefreshKey, setCollectionsRefreshKey] = useState(0);
   const { items: collectionItems, loading: collectionsLoading } =
@@ -700,6 +701,22 @@ function App() {
     filterNeedle === ''
       ? uploadItems
       : uploadItems.filter((it) => it.filename.toLowerCase().includes(filterNeedle));
+
+  async function handleDeleteAudio(name: string) {
+    try {
+      const res = await fetch(`${LIBRARY_AUDIO_URL}/${encodeURIComponent(name)}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (activeAudio?.name === name) {
+        setActiveAudio(null);
+      }
+      setAudioRefreshKey((k) => k + 1);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Delete audio failed';
+      setNotice(`Could not delete audio item "${name}": ${msg}`);
+    }
+  }
 
   async function handleCreateCollection(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -931,6 +948,14 @@ function App() {
                     ▶
                   </button>
                   <span className="audio-name">{item.name}</span>
+                  <button
+                    type="button"
+                    className="audio-delete"
+                    onClick={() => handleDeleteAudio(item.name)}
+                    aria-label={`Delete ${item.name}`}
+                  >
+                    ✕
+                  </button>
                 </li>
               ))}
             </ul>

@@ -558,5 +558,9 @@
 
 - Task: added `DELETE /library/video/{name}` API endpoint in `apps/api/app/routes/library.py` to delete an MP4 video file from `library/video/` with path-traversal protection (`_resolve_video_file`) and best-effort cleanup of its associated thumbnail (`library/thumbnails/<stem>.jpg`), returning 204 No Content on success or 404 for missing/invalid/path-escaping files; added unit test coverage in `tests/test_library.py` (file + thumbnail removal, deletion without thumbnail, missing file 404, non-mp4 404, path traversal blocking).
 - Verification: `cd apps/api && .venv/Scripts/python -m pytest` — 209 passed.
-- Next small step: add delete button next to audio items in main web app Audio card (`apps/web/src/main.tsx`) calling `DELETE /library/audio/{name}`.
+## 2026-07-29 00:03 SEAST — Slow Builder (Delete Audio Button in Web App)
+
+- Task: added delete button next to audio items in main web app Audio card (`apps/web/src/main.tsx`) calling `DELETE /library/audio/{name}` with error banner notice on failure and automatic list refresh + active player track cleanup on success; updated `apps/web/src/styles.css` with `.audio-delete` button styling and responsive `.audio-name` flex layout.
+- Verification: `cd apps/web && npm run build` — clean build (0 errors, 15 modules transformed).
+- Next small step: add delete button next to video items in main web app Video card (`apps/web/src/main.tsx`) calling `DELETE /library/video/{name}`.
 
