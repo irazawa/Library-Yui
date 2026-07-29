@@ -282,7 +282,7 @@ function useLibraryTags() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = (await res.json()) as { tags: string[] };
         if (cancelled) return;
-        setTags(data.tags);
+        setTags(Array.isArray(data?.tags) ? data.tags : []);
       })
       .catch(() => {
         if (cancelled) return;
@@ -381,10 +381,34 @@ interface CollectionRowProps {
   isExpanded: boolean;
   onToggle: () => void;
   formatBytes: (bytes: number) => string;
+  onError?: (msg: string) => void;
 }
 
-function CollectionRow({ collection, isExpanded, onToggle, formatBytes }: CollectionRowProps) {
-  const { items, loading, error } = useCollectionItems(isExpanded ? collection.name : null);
+function CollectionRow({ collection, isExpanded, onToggle, formatBytes, onError }: CollectionRowProps) {
+  const [itemsRefreshKey, setItemsRefreshKey] = useState(0);
+  const { items, loading, error } = useCollectionItems(
+    isExpanded ? collection.name : null,
+    itemsRefreshKey,
+  );
+  const [removingId, setRemovingId] = useState<number | null>(null);
+
+  async function handleRemoveItem(metadataId: number) {
+    if (removingId !== null) return;
+    setRemovingId(metadataId);
+    try {
+      const res = await fetch(
+        `${COLLECTIONS_URL}/${encodeURIComponent(collection.name)}/items/${metadataId}`,
+        { method: 'DELETE' },
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setItemsRefreshKey((k) => k + 1);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Remove item failed';
+      onError?.(msg);
+    } finally {
+      setRemovingId(null);
+    }
+  }
 
   return (
     <li className={`collection-item ${isExpanded ? 'collection-item-expanded' : ''}`}>
@@ -428,6 +452,15 @@ function CollectionRow({ collection, isExpanded, onToggle, formatBytes }: Collec
                 <li key={item.id} className="collection-sub-item">
                   <span className="collection-sub-item-name">{item.filename}</span>
                   <span className="collection-sub-item-meta">{formatBytes(item.size)}</span>
+                  <button
+                    type="button"
+                    className="collection-sub-item-remove"
+                    disabled={removingId === item.id}
+                    onClick={() => handleRemoveItem(item.id)}
+                    aria-label={`Remove ${item.filename} from ${collection.name}`}
+                  >
+                    ✕
+                  </button>
                 </li>
               ))}
             </ul>
@@ -905,6 +938,13 @@ function App() {
     }
   }
 
+  useEffect(() => {
+    if (jobStatus === 'completed') {
+      setAudioRefreshKey((k) => k + 1);
+      setVideoRefreshKey((k) => k + 1);
+    }
+  }, [jobStatus]);
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const trimmed = url.trim();
@@ -921,6 +961,8 @@ function App() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const job = (await res.json()) as { id: string };
       setJobId(job.id);
+      const startRes = await fetch(`${JOBS_URL}/${job.id}/start`, { method: 'POST' });
+      if (!startRes.ok) throw new Error(`HTTP ${startRes.status}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Request failed';
       setJobError(msg);
@@ -1175,7 +1217,7 @@ function App() {
             <p>Uploaded files will appear here.</p>
           ) : (
             <>
-              {availableTags.length > 0 && (
+              {(availableTags ?? []).length > 0 && (
                 <select
                   className="uploads-tag-filter"
                   value={uploadsTagFilter}
@@ -1183,7 +1225,7 @@ function App() {
                   aria-label="Filter uploads by tag"
                 >
                   <option value="">All tags</option>
-                  {availableTags.map((tag) => (
+                  {(availableTags ?? []).map((tag) => (
                     <option key={tag} value={tag}>
                       {tag}
                     </option>
@@ -1288,6 +1330,7 @@ function App() {
                     setExpandedCollection((prev) => (prev === col.name ? null : col.name))
                   }
                   formatBytes={formatBytes}
+                  onError={(msg) => setNotice(`Remove item failed: ${msg}`)}
                 />
               ))}
             </ul>

@@ -589,9 +589,15 @@
 - Verification: `cd apps/web && npm run build` — clean build (0 errors, 15 modules transformed); `cd apps/api && .\.venv\Scripts\python -m pytest` — 217 passed.
 - Next small step: expand Collections card in main web app (`apps/web/src/main.tsx`) to show items inside an expanded collection fetched from `GET /collections/{name}/items`.
 
-## 2026-07-29 09:03 SEAST — Slow Builder (Expand Collections Card in Web App)
+## 2026-07-29 09:35 SEAST — Slow Builder (Fix Download Job Pending Bug)
 
-- Task: expanded Collections card in main web app (`apps/web/src/main.tsx` + `styles.css`) to show items inside an expanded collection — added `useCollectionItems` hook fetching `GET /collections/{name}/items`, `CollectionRow` component with toggle control (`▶` / `▼`), and list display for collection sub-items with loading, error, and empty state support.
+- Task: fixed bug where created download jobs remained stuck in `pending` status indefinitely — updated `handleSubmit` in `apps/web/src/main.tsx` to automatically invoke `POST /jobs/{id}/start` immediately after job creation, added `useEffect` hook to auto-refresh Audio and Video cards when `jobStatus === 'completed'`, and enabled `LIBRARY_YUI_DOWNLOADS_ENABLED=1` in `scripts/dev.sh`.
 - Verification: `cd apps/web && npm run build` — clean build (0 errors, 15 modules transformed); `cd apps/api && .\.venv\Scripts\python -m pytest` — 217 passed.
 - Next small step: add a remove button for collection items in main web app calling `DELETE /collections/{name}/items/{metadata_id}`.
+
+## 2026-07-29 10:03 SEAST — Slow Builder (Remove Collection Item Button in Web App)
+
+- Task: added a remove button (`✕`) for collection items in the expanded collection list in the main web app (`apps/web/src/main.tsx` + `styles.css`) calling `DELETE /collections/{name}/items/{metadata_id}` with error notice reporting and automatic sub-item list refresh upon removal.
+- Verification: `cd apps/web && npm run build` — clean build (0 errors, 15 modules transformed); `cd apps/api && .\.venv\Scripts\python -m pytest` — 217 passed.
+- Next small step: add `GET /library/export` endpoint in `apps/api/app/routes/library.py` returning a JSON dump of all metadata, tags, collections, and jobs.
 
