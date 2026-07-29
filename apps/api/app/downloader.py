@@ -76,6 +76,57 @@ def _video_args(output_dir: Path) -> list[str]:
     ]
 
 
+def _find_repo_root() -> Path:
+    """Return the absolute path to the repository root directory."""
+    current = Path(__file__).resolve().parent
+    return next((p for p in [current, *current.parents] if (p / "apps").is_dir()), current.parents[2])
+
+
+def _resolve_yt_dlp() -> str:
+    """Resolve the yt-dlp executable path.
+
+    Checks PATH via shutil.which, then looks for binary in common app locations
+    (such as apps/api/yt-dlp.exe, apps/web/yt-dlp.exe or repo root) before
+    falling back to 'yt-dlp.exe'.
+    """
+
+    found = shutil.which("yt-dlp") or shutil.which("yt-dlp.exe")
+    if found:
+        return found
+
+    repo_root = _find_repo_root()
+    candidates = [
+        repo_root / "apps" / "api" / "yt-dlp.exe",
+        repo_root / "apps" / "api" / "yt-dlp",
+        repo_root / "apps" / "web" / "yt-dlp.exe",
+        repo_root / "apps" / "web" / "yt-dlp",
+        repo_root / "yt-dlp.exe",
+    ]
+    for candidate in candidates:
+        if candidate.is_file():
+            return str(candidate)
+
+    return "yt-dlp.exe"
+
+
+def _get_subprocess_env() -> dict[str, str]:
+    """Build environment for subprocesses including apps/api and apps/web in PATH.
+
+    This ensures yt-dlp can locate helper tools (such as deno.exe or ffmpeg.exe)
+    placed in apps/api or apps/web even when they are not in the global system PATH.
+    """
+
+    env = os.environ.copy()
+    repo_root = _find_repo_root()
+    api_dir = str(repo_root / "apps" / "api")
+    web_dir = str(repo_root / "apps" / "web")
+    path_var = env.get("PATH", "")
+    dirs_to_add = [d for d in (api_dir, web_dir) if d not in path_var.split(os.pathsep)]
+    if dirs_to_add:
+        env["PATH"] = os.pathsep.join(dirs_to_add) + os.pathsep + path_var
+    return env
+
+
 def build_mp3_command(url: str, output_dir: Path = AUDIO_DIR) -> list[str]:
     """Build the full yt-dlp command to download a single URL as MP3.
 
@@ -85,7 +136,7 @@ def build_mp3_command(url: str, output_dir: Path = AUDIO_DIR) -> list[str]:
     concurrent fragment downloads.
     """
 
-    yt_dlp = shutil.which("yt-dlp") or "yt-dlp.exe"
+    yt_dlp = _resolve_yt_dlp()
     return [
         yt_dlp,
         "--ignore-errors",
@@ -113,7 +164,7 @@ def download_mp3(url: str, output_dir: Path = AUDIO_DIR) -> dict:
 
     output_dir.mkdir(parents=True, exist_ok=True)
     command = build_mp3_command(url, output_dir)
-    result = subprocess.run(command)
+    result = subprocess.run(command, env=_get_subprocess_env())
     return {
         "ok": result.returncode == 0,
         "returncode": result.returncode,
@@ -129,7 +180,7 @@ def build_mp4_command(url: str, output_dir: Path = VIDEO_DIR) -> list[str]:
     *output_dir* (defaults to ``VIDEO_DIR``).
     """
 
-    yt_dlp = shutil.which("yt-dlp") or "yt-dlp.exe"
+    yt_dlp = _resolve_yt_dlp()
     return [
         yt_dlp,
         "--ignore-errors",
@@ -157,7 +208,7 @@ def download_mp4(url: str, output_dir: Path = VIDEO_DIR) -> dict:
 
     output_dir.mkdir(parents=True, exist_ok=True)
     command = build_mp4_command(url, output_dir)
-    result = subprocess.run(command)
+    result = subprocess.run(command, env=_get_subprocess_env())
     return {
         "ok": result.returncode == 0,
         "returncode": result.returncode,
@@ -183,7 +234,23 @@ def _resolve_ffmpeg() -> str | None:
     which makes thumbnail extraction a best-effort, non-fatal operation.
     """
 
-    return shutil.which("ffmpeg") or shutil.which("ffmpeg.exe")
+    found = shutil.which("ffmpeg") or shutil.which("ffmpeg.exe")
+    if found:
+        return found
+
+    repo_root = _find_repo_root()
+    candidates = [
+        repo_root / "apps" / "api" / "ffmpeg.exe",
+        repo_root / "apps" / "api" / "ffmpeg",
+        repo_root / "apps" / "web" / "ffmpeg.exe",
+        repo_root / "apps" / "web" / "ffmpeg",
+        repo_root / "ffmpeg.exe",
+    ]
+    for candidate in candidates:
+        if candidate.is_file():
+            return str(candidate)
+
+    return None
 
 
 def build_thumbnail_command(

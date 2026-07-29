@@ -83,7 +83,7 @@ def test_download_invokes_subprocess_when_enabled(monkeypatch, tmp_path):
     class FakeResult:
         returncode = 0
 
-    def fake_run(command):
+    def fake_run(command, *args, **kwargs):
         captured["command"] = command
         return FakeResult()
 
@@ -141,7 +141,7 @@ def test_download_mp4_invokes_subprocess_when_enabled(monkeypatch, tmp_path):
     class FakeResult:
         returncode = 0
 
-    def fake_run(command):
+    def fake_run(command, *args, **kwargs):
         captured["command"] = command
         return FakeResult()
 

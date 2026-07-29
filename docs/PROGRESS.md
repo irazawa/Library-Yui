@@ -601,3 +601,8 @@
 - Verification: `cd apps/web && npm run build` — clean build (0 errors, 15 modules transformed); `cd apps/api && .\.venv\Scripts\python -m pytest` — 217 passed.
 - Next small step: add `GET /library/export` endpoint in `apps/api/app/routes/library.py` returning a JSON dump of all metadata, tags, collections, and jobs.
 
+## 2026-07-29 11:03 SEAST — Slow Builder (GET /library/export)
+
+- Task: added `GET /library/export` endpoint in `apps/api/app/routes/library.py` returning a JSON dump of all metadata, tags, collections, and jobs (`metadata`, `tags`, `collections`, `jobs`), gracefully returning empty lists when the database or job store is empty; added unit tests in `apps/api/tests/test_library.py` (`test_library_export_returns_empty_lists_when_no_db_or_jobs`, `test_library_export_dumps_all_entities`).
+- Verification: `cd apps/api && .\.venv\Scripts\python -m pytest` — 219 passed.
+- Next small step: update `docs/API.md` documenting `DELETE /jobs/completed`, `GET /library/export`, and `?q=` search params on audio/video endpoints.

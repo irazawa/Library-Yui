@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from app import database
 from app.database import DEFAULT_DB_PATH
+from app.jobs import list_jobs
 from app.storage import AUDIO_DIR, STORAGE_DIRS, THUMBNAILS_DIR, UPLOADS_DIR, VIDEO_DIR, ensure_storage_dirs
 
 router = APIRouter()
@@ -110,6 +111,20 @@ class CollectionItemAddRequest(BaseModel):
 class CollectionItemsResponse(BaseModel):
     collection: CollectionResponse
     items: list[UploadResponse]
+
+
+class JobExportResponse(BaseModel):
+    id: str
+    url: str
+    status: str
+    mode: str
+
+
+class LibraryExportResponse(BaseModel):
+    metadata: list[UploadResponse]
+    tags: list[str]
+    collections: list[CollectionResponse]
+    jobs: list[JobExportResponse]
 
 
 def _count_files(directory: Path) -> int:
@@ -282,6 +297,49 @@ def get_library_storage() -> StorageUsageResponse:
 
     sizes = {name: _dir_size_bytes(path) for name, path in STORAGE_DIRS.items()}
     return StorageUsageResponse(**sizes)
+
+
+@router.get(
+    "/library/export",
+    response_model=LibraryExportResponse,
+    tags=["Library"],
+)
+def export_library() -> LibraryExportResponse:
+    """Return a JSON dump of all metadata, tags, collections, and jobs.
+
+    Returns empty lists for database-backed fields when the database file does
+    not exist yet.
+    """
+
+    db_file = Path(DB_PATH)
+    if not db_file.is_file():
+        metadata_items = []
+        tag_items = []
+        collection_items = []
+    else:
+        try:
+            metadata_items = database.list_metadata(DB_PATH)
+        except sqlite3.Error:
+            metadata_items = []
+
+        try:
+            tag_items = database.list_all_tags(DB_PATH)
+        except sqlite3.Error:
+            tag_items = []
+
+        try:
+            collection_items = database.list_collections(DB_PATH)
+        except sqlite3.Error:
+            collection_items = []
+
+    jobs_data = list_jobs()
+
+    return LibraryExportResponse(
+        metadata=[UploadResponse(**r) for r in metadata_items],
+        tags=tag_items,
+        collections=[CollectionResponse(**c) for c in collection_items],
+        jobs=[JobExportResponse(**j) for j in jobs_data],
+    )
 
 
 @router.get("/library/audio", response_model=AudioListResponse, tags=["Library"])

@@ -1126,3 +1126,54 @@ def test_remove_collection_item_unknown_collection_returns_404(monkeypatch, tmp_
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Collection not found"
+
+
+def test_library_export_returns_empty_lists_when_no_db_or_jobs(monkeypatch, tmp_path):
+    monkeypatch.setattr(library_route, "DB_PATH", tmp_path / "missing.db")
+    from app.jobs import reset_jobs
+
+    reset_jobs()
+
+    response = client.get("/library/export")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "metadata": [],
+        "tags": [],
+        "collections": [],
+        "jobs": [],
+    }
+
+
+def test_library_export_dumps_all_entities(monkeypatch, tmp_path):
+    db_path = tmp_path / "test.db"
+    monkeypatch.setattr(library_route, "DB_PATH", db_path)
+
+    from app import database
+    from app.jobs import create_job, reset_jobs
+
+    reset_jobs()
+    database.init_db(db_path)
+
+    meta_id = database.insert_metadata(
+        filename="track.mp3",
+        path=str(tmp_path / "track.mp3"),
+        size=100,
+        content_type="audio/mpeg",
+        db_path=db_path,
+    )
+    database.add_tag_to_metadata(meta_id, "rock", db_path=db_path)
+    database.create_collection("Favorites", db_path=db_path)
+    job = create_job("https://www.youtube.com/watch?v=dQw4w9WgXcQ", mode="audio")
+
+    response = client.get("/library/export")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["metadata"]) == 1
+    assert body["metadata"][0]["id"] == meta_id
+    assert body["tags"] == ["rock"]
+    assert len(body["collections"]) == 1
+    assert body["collections"][0]["name"] == "Favorites"
+    assert len(body["jobs"]) == 1
+    assert body["jobs"][0]["id"] == job["id"]

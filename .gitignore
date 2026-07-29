@@ -28,3 +28,4 @@ library/thumbnails/*
 Thumbs.db
 .vscode/
 .idea/
+*.exe
