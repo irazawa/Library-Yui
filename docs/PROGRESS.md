@@ -647,3 +647,10 @@
 - Verification: `cd apps/web && npm run build` — clean build (0 errors, 15 modules transformed); `cd apps/api && py -3.14 -m pytest` — 225 passed.
 - Next small step: add `POST /collections/{name}/rename` API endpoint in `apps/api/app/routes/library.py` updating a collection's name.
 
+## 2026-07-29 19:03 SEAST — Slow Builder (POST /collections/{name}/rename)
+
+- Task: added `rename_collection` database helper in `apps/api/app/database.py` and `POST /collections/{name}/rename` API endpoint in `apps/api/app/routes/library.py` (with `CollectionRenameRequest` body `{new_name}`) returning 200 with updated collection object, 404 when collection is missing, 422 for blank new_name, and 409 when new_name collides with an existing collection; added unit tests in `apps/api/tests/test_database.py` and integration tests in `apps/api/tests/test_library.py`.
+- Verification: `python -m pytest tests` in `apps/api` — 233 passed.
+- Next small step: add inline collection rename form/control in main web app (`apps/web/src/main.tsx`).
+
+

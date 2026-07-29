@@ -95,6 +95,11 @@ class CollectionCreateRequest(BaseModel):
     name: str
 
 
+class CollectionRenameRequest(BaseModel):
+    new_name: str
+
+
+
 class CollectionResponse(BaseModel):
     id: int
     name: str
@@ -1080,6 +1085,41 @@ def delete_collection(name: str) -> None:
             detail="Collection not found",
         )
     return None
+
+
+@router.post(
+    "/collections/{name}/rename",
+    response_model=CollectionResponse,
+    tags=["Collections"],
+)
+def rename_collection(name: str, body: CollectionRenameRequest) -> CollectionResponse:
+    """Rename an existing collection.
+
+    Returns 200 with the updated collection response. Returns 404 when the
+    collection is not found. Blank new_name is rejected with 422, and duplicate
+    names with 409.
+    """
+
+    database.init_db(DB_PATH)
+    try:
+        row = database.rename_collection(name, body.new_name, db_path=DB_PATH)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="collection name must be a non-empty string",
+        )
+    except sqlite3.IntegrityError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A collection with that name already exists",
+        )
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Collection not found",
+        )
+    return CollectionResponse(**row)
+
 
 
 

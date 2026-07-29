@@ -1271,3 +1271,56 @@ def test_library_import_empty_payload_returns_zero_counts(monkeypatch, tmp_path)
         "imported_collections": 0,
         "imported_jobs": 0,
     }
+
+
+def test_rename_collection_returns_200_and_updates_name(monkeypatch, tmp_path):
+    db_path = tmp_path / "test.db"
+    monkeypatch.setattr(library_route, "DB_PATH", db_path)
+
+    create_resp = client.post("/collections", json={"name": "Favorites"})
+    assert create_resp.status_code == 201
+    coll_id = create_resp.json()["id"]
+
+    response = client.post("/collections/Favorites/rename", json={"new_name": "Best Tracks"})
+
+    assert response.status_code == 200
+    assert response.json() == {"id": coll_id, "name": "Best Tracks"}
+
+    get_resp = client.get("/collections")
+    assert get_resp.status_code == 200
+    assert get_resp.json()["items"] == [{"id": coll_id, "name": "Best Tracks"}]
+
+
+def test_rename_collection_unknown_returns_404(monkeypatch, tmp_path):
+    db_path = tmp_path / "test.db"
+    monkeypatch.setattr(library_route, "DB_PATH", db_path)
+
+    response = client.post("/collections/Missing/rename", json={"new_name": "New Name"})
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Collection not found"
+
+
+def test_rename_collection_blank_name_returns_422(monkeypatch, tmp_path):
+    db_path = tmp_path / "test.db"
+    monkeypatch.setattr(library_route, "DB_PATH", db_path)
+
+    client.post("/collections", json={"name": "Favorites"})
+
+    response = client.post("/collections/Favorites/rename", json={"new_name": "   "})
+
+    assert response.status_code == 422
+
+
+def test_rename_collection_duplicate_name_returns_409(monkeypatch, tmp_path):
+    db_path = tmp_path / "test.db"
+    monkeypatch.setattr(library_route, "DB_PATH", db_path)
+
+    client.post("/collections", json={"name": "Favorites"})
+    client.post("/collections", json={"name": "Chill"})
+
+    response = client.post("/collections/Favorites/rename", json={"new_name": "Chill"})
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "A collection with that name already exists"
+

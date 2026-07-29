@@ -867,3 +867,58 @@ def test_delete_collection_returns_none_when_missing(tmp_path):
     deleted = database.delete_collection("Missing", db_path=db_path)
 
     assert deleted is None
+
+
+def test_rename_collection_updates_name(tmp_path):
+    """rename_collection updates the collection's name and returns the row."""
+    db_path = tmp_path / "library.db"
+    database.init_db(db_path=db_path)
+    coll = database.create_collection("Favorites", db_path=db_path)
+
+    renamed = database.rename_collection("Favorites", "Best Tracks", db_path=db_path)
+
+    assert renamed == {"id": coll["id"], "name": "Best Tracks"}
+    assert database.get_collection_by_name("Favorites", db_path=db_path) is None
+    assert database.get_collection_by_name("Best Tracks", db_path=db_path) == renamed
+
+
+def test_rename_collection_returns_none_when_missing(tmp_path):
+    """rename_collection returns None when collection name does not exist."""
+    db_path = tmp_path / "library.db"
+    database.init_db(db_path=db_path)
+
+    renamed = database.rename_collection("Missing", "New Name", db_path=db_path)
+
+    assert renamed is None
+
+
+def test_rename_collection_rejects_blank_name(tmp_path):
+    """rename_collection raises ValueError on empty or whitespace new_name."""
+    db_path = tmp_path / "library.db"
+    database.init_db(db_path=db_path)
+    database.create_collection("Favorites", db_path=db_path)
+
+    try:
+        database.rename_collection("Favorites", "   ", db_path=db_path)
+        accepted = True
+    except ValueError:
+        accepted = False
+
+    assert accepted is False
+
+
+def test_rename_collection_rejects_duplicate_name(tmp_path):
+    """rename_collection raises IntegrityError when new_name is taken."""
+    db_path = tmp_path / "library.db"
+    database.init_db(db_path=db_path)
+    database.create_collection("Favorites", db_path=db_path)
+    database.create_collection("Chill", db_path=db_path)
+
+    try:
+        database.rename_collection("Favorites", "Chill", db_path=db_path)
+        duplicated = True
+    except sqlite3.IntegrityError:
+        duplicated = False
+
+    assert duplicated is False
+

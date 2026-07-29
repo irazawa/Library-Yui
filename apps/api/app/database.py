@@ -585,6 +585,42 @@ def delete_collection(
         connection.close()
 
 
+def rename_collection(
+    name: str,
+    new_name: str,
+    db_path: Path | str = DEFAULT_DB_PATH,
+) -> dict | None:
+    """Rename an existing collection from *name* to *new_name*.
+
+    Returns the updated collection row ``{"id": ..., "name": new_name}`` or
+    ``None`` when no collection with *name* exists. Raises :class:`ValueError`
+    for a blank new_name and lets :class:`sqlite3.IntegrityError` propagate
+    when *new_name* is already taken by another collection.
+    """
+
+    cleaned = new_name.strip()
+    if not cleaned:
+        raise ValueError("collection name must be a non-empty string")
+
+    connection = get_connection(db_path)
+    try:
+        row = connection.execute(
+            "SELECT id, name FROM collections WHERE name = ?", (name,)
+        ).fetchone()
+        if row is None:
+            return None
+        collection_id = int(row["id"])
+        connection.execute(
+            "UPDATE collections SET name = ? WHERE id = ?",
+            (cleaned, collection_id),
+        )
+        connection.commit()
+        return {"id": collection_id, "name": cleaned}
+    finally:
+        connection.close()
+
+
+
 
 def add_item_to_collection(
     collection_id: int,
