@@ -634,3 +634,9 @@
 - Task: added a delete collection button (`✕`) to each collection header in the Collections card in the main web app (`apps/web/src/main.tsx` + `styles.css`) calling `DELETE /collections/{name}`, handling `deleting` state, clearing `expandedCollection` if the deleted collection was active, and triggering collection list refresh + error banner reporting on failure.
 - Verification: `cd apps/web && npm run build` — clean build (0 errors, 15 modules transformed); `cd apps/api && .\.venv\Scripts\python -m pytest` — 223 passed.
 - Next small step: add `POST /library/import` API endpoint in `apps/api/app/routes/library.py` to restore metadata, tags, and collections from an exported JSON dump.
+
+## 2026-07-29 17:03 SEAST — Slow Builder (POST /library/import)
+
+- Task: added `import_metadata` helper in `apps/api/app/database.py`, `import_job` helper in `apps/api/app/jobs.py`, and `POST /library/import` API endpoint in `apps/api/app/routes/library.py` to restore metadata, tags, collections, and jobs from an exported JSON dump with response counts (`imported_metadata`, `imported_tags`, `imported_collections`, `imported_jobs`); added unit and integration tests in `apps/api/tests/test_library.py`.
+- Verification: `cd apps/api && .\.venv\Scripts\python -m pytest` — 225 passed.
+- Next small step: add an "Import JSON" button & file selector in main web app (`apps/web/src/main.tsx`) calling `POST /library/import`.

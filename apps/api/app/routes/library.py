@@ -127,6 +127,20 @@ class LibraryExportResponse(BaseModel):
     jobs: list[JobExportResponse]
 
 
+class LibraryImportRequest(BaseModel):
+    metadata: list[dict] = []
+    tags: list[str] = []
+    collections: list[dict | str] = []
+    jobs: list[dict] = []
+
+
+class LibraryImportResponse(BaseModel):
+    imported_metadata: int
+    imported_tags: int
+    imported_collections: int
+    imported_jobs: int
+
+
 def _count_files(directory: Path) -> int:
     """Count regular files directly inside a storage directory.
 
@@ -339,6 +353,90 @@ def export_library() -> LibraryExportResponse:
         tags=tag_items,
         collections=[CollectionResponse(**c) for c in collection_items],
         jobs=[JobExportResponse(**j) for j in jobs_data],
+    )
+
+
+@router.post(
+    "/library/import",
+    response_model=LibraryImportResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Library"],
+)
+def import_library(body: LibraryImportRequest) -> LibraryImportResponse:
+    """Restore metadata, tags, collections, and jobs from an exported JSON dump."""
+
+    database.init_db(DB_PATH)
+
+    imported_meta = 0
+    for meta in body.metadata:
+        if not isinstance(meta, dict) or "filename" not in meta or "path" not in meta:
+            continue
+        row_id = database.import_metadata(
+            id=meta.get("id"),
+            filename=str(meta["filename"]),
+            path=str(meta["path"]),
+            size=int(meta.get("size", 0)),
+            content_type=meta.get("content_type"),
+            uploaded_at=meta.get("uploaded_at"),
+            db_path=DB_PATH,
+        )
+        imported_meta += 1
+        tags_list = meta.get("tags", [])
+        if isinstance(tags_list, list):
+            for t in tags_list:
+                if isinstance(t, str) and t.strip():
+                    database.add_tag_to_metadata(row_id, t.strip(), db_path=DB_PATH)
+
+    imported_tags = 0
+    for tag in body.tags:
+        if isinstance(tag, str) and tag.strip():
+            connection = database.get_connection(DB_PATH)
+            try:
+                connection.execute(
+                    "INSERT OR IGNORE INTO tags (name) VALUES (?)", (tag.strip(),)
+                )
+                connection.commit()
+            finally:
+                connection.close()
+            imported_tags += 1
+
+    imported_collections = 0
+    for col in body.collections:
+        col_name = None
+        if isinstance(col, str):
+            col_name = col.strip()
+        elif isinstance(col, dict) and "name" in col and isinstance(col["name"], str):
+            col_name = col["name"].strip()
+
+        if col_name:
+            connection = database.get_connection(DB_PATH)
+            try:
+                connection.execute(
+                    "INSERT OR IGNORE INTO collections (name) VALUES (?)", (col_name,)
+                )
+                connection.commit()
+            finally:
+                connection.close()
+            imported_collections += 1
+
+    imported_jobs = 0
+    from app.jobs import import_job
+
+    for j in body.jobs:
+        if isinstance(j, dict) and "id" in j and "url" in j:
+            import_job(
+                job_id=str(j["id"]),
+                url=str(j["url"]),
+                status=str(j.get("status", "pending")),
+                mode=str(j.get("mode", "audio")),
+            )
+            imported_jobs += 1
+
+    return LibraryImportResponse(
+        imported_metadata=imported_meta,
+        imported_tags=imported_tags,
+        imported_collections=imported_collections,
+        imported_jobs=imported_jobs,
     )
 
 

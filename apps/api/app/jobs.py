@@ -270,3 +270,17 @@ def reset_jobs() -> None:
 
     _JOBS.clear()
     _JOB_TIMESTAMPS.clear()
+
+
+def import_job(job_id: str, url: str, status: str = "pending", mode: str = DEFAULT_MODE) -> JobRecord:
+    """Import a job into the in-memory store and persist to SQLite.
+
+    Updates or inserts the job record and its timestamp entry.
+    """
+
+    now = _now_iso()
+    job: JobRecord = {"id": job_id, "url": url, "status": status, "mode": mode}
+    _JOBS[job_id] = job
+    _JOB_TIMESTAMPS[job_id] = {"created_at": now, "updated_at": now}
+    _persist_job(job, now, now)
+    return job

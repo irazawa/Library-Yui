@@ -1203,3 +1203,71 @@ def test_delete_collection_unknown_returns_404(monkeypatch, tmp_path):
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Collection not found"
+
+
+def test_library_import_restores_metadata_tags_collections_and_jobs(monkeypatch, tmp_path):
+    db_path = tmp_path / "test.db"
+    monkeypatch.setattr(library_route, "DB_PATH", db_path)
+
+    from app.jobs import reset_jobs, get_job
+    reset_jobs()
+
+    payload = {
+        "metadata": [
+            {
+                "id": 42,
+                "filename": "imported_track.mp3",
+                "path": str(tmp_path / "imported_track.mp3"),
+                "size": 2048,
+                "content_type": "audio/mpeg",
+                "tags": ["ambient"],
+            }
+        ],
+        "tags": ["ambient", "chill"],
+        "collections": [{"id": 1, "name": "Favorites"}, "Chill Vibe"],
+        "jobs": [
+            {
+                "id": "job-123",
+                "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                "status": "completed",
+                "mode": "audio",
+            }
+        ],
+    }
+
+    response = client.post("/library/import", json=payload)
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "imported_metadata": 1,
+        "imported_tags": 2,
+        "imported_collections": 2,
+        "imported_jobs": 1,
+    }
+
+    # Verify database state
+    tags_resp = client.get("/library/tags")
+    assert set(tags_resp.json()["items"]) == {"ambient", "chill"}
+
+    cols_resp = client.get("/collections")
+    col_names = [c["name"] for c in cols_resp.json()["items"]]
+    assert set(col_names) == {"Favorites", "Chill Vibe"}
+
+    job = get_job("job-123")
+    assert job is not None
+    assert job["status"] == "completed"
+
+
+def test_library_import_empty_payload_returns_zero_counts(monkeypatch, tmp_path):
+    db_path = tmp_path / "test.db"
+    monkeypatch.setattr(library_route, "DB_PATH", db_path)
+
+    response = client.post("/library/import", json={})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "imported_metadata": 0,
+        "imported_tags": 0,
+        "imported_collections": 0,
+        "imported_jobs": 0,
+    }

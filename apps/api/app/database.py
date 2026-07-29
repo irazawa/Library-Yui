@@ -239,6 +239,45 @@ def insert_metadata(
         connection.close()
 
 
+def import_metadata(
+    *,
+    id: int | None = None,
+    filename: str,
+    path: str,
+    size: int,
+    content_type: str | None = None,
+    uploaded_at: str | None = None,
+    db_path: Path | str = DEFAULT_DB_PATH,
+) -> int:
+    """Insert or replace a metadata row during library import."""
+
+    connection = get_connection(db_path)
+    ts = uploaded_at or _now_iso()
+    try:
+        if id is not None:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO metadata (id, filename, path, size, content_type, uploaded_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (id, filename, path, size, content_type, ts),
+            )
+            connection.commit()
+            return id
+        else:
+            cursor = connection.execute(
+                """
+                INSERT INTO metadata (filename, path, size, content_type, uploaded_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (filename, path, size, content_type, ts),
+            )
+            connection.commit()
+            return int(cursor.lastrowid)
+    finally:
+        connection.close()
+
+
 def add_tag_to_metadata(
     metadata_id: int,
     tag: str,
