@@ -582,3 +582,9 @@
 - Task: added optional `?q=` query parameter filtering (case-insensitive filename substring search) to `GET /library/audio` and `GET /library/video` endpoints in `apps/api/app/routes/library.py`; added unit tests in `apps/api/tests/test_library.py` (`test_library_audio_filters_by_query`, `test_library_video_filters_by_query`).
 - Verification: `cd apps/api && .\.venv\Scripts\python -m pytest` — 217 passed.
 - Next small step: add search inputs to the Audio and Video cards in the main web app (`apps/web/src/main.tsx`) filtering items via `?q=`.
+
+## 2026-07-29 08:03 SEAST — Slow Builder (Audio & Video Search Inputs in Web App)
+
+- Task: added search inputs to the Audio and Video cards in the main web app (`apps/web/src/main.tsx` + `styles.css`) filtering library items via `?q=` query parameters passed to `useLibraryAudio` and `useLibraryVideo` hooks; added empty matching state text (`No audio matching "..."`, `No video matching "..."`) when queries return no items.
+- Verification: `cd apps/web && npm run build` — clean build (0 errors, 15 modules transformed); `cd apps/api && .\.venv\Scripts\python -m pytest` — 217 passed.
+- Next small step: expand Collections card in main web app (`apps/web/src/main.tsx`) to show items inside an expanded collection fetched from `GET /collections/{name}/items`.

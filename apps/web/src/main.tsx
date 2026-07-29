@@ -178,15 +178,18 @@ function useLibrarySummary() {
 /**
  * Fetch the list of MP3 files in the audio library via `GET /library/audio`.
  * Returns the list of audio items plus a loading flag.
+ * Accepts optional `query` parameter to filter by filename substring (`?q=`).
  */
-function useLibraryAudio(refreshKey: number = 0) {
+function useLibraryAudio(refreshKey: number = 0, query: string = '') {
   const [items, setItems] = useState<AudioItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetch(LIBRARY_AUDIO_URL)
+    const q = query.trim();
+    const url = q !== '' ? `${LIBRARY_AUDIO_URL}?q=${encodeURIComponent(q)}` : LIBRARY_AUDIO_URL;
+    fetch(url)
       .then(async (res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = (await res.json()) as AudioListResponse;
@@ -204,7 +207,7 @@ function useLibraryAudio(refreshKey: number = 0) {
     return () => {
       cancelled = true;
     };
-  }, [refreshKey]);
+  }, [refreshKey, query]);
 
   return { items, loading };
 }
@@ -212,15 +215,18 @@ function useLibraryAudio(refreshKey: number = 0) {
 /**
  * Fetch the list of MP4 files in the video library via `GET /library/video`.
  * Returns the list of video items plus a loading flag.
+ * Accepts optional `query` parameter to filter by filename substring (`?q=`).
  */
-function useLibraryVideo(refreshKey: number = 0) {
+function useLibraryVideo(refreshKey: number = 0, query: string = '') {
   const [items, setItems] = useState<VideoItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetch(LIBRARY_VIDEO_URL)
+    const q = query.trim();
+    const url = q !== '' ? `${LIBRARY_VIDEO_URL}?q=${encodeURIComponent(q)}` : LIBRARY_VIDEO_URL;
+    fetch(url)
       .then(async (res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = (await res.json()) as VideoListResponse;
@@ -238,7 +244,7 @@ function useLibraryVideo(refreshKey: number = 0) {
     return () => {
       cancelled = true;
     };
-  }, [refreshKey]);
+  }, [refreshKey, query]);
 
   return { items, loading };
 }
@@ -625,9 +631,11 @@ function AudioPlayerBar({ track, onClose }: AudioPlayerBarProps) {
 function App() {
   const { state, summary } = useLibrarySummary();
   const [audioRefreshKey, setAudioRefreshKey] = useState(0);
-  const { items: audioItems, loading: audioLoading } = useLibraryAudio(audioRefreshKey);
+  const [audioQuery, setAudioQuery] = useState('');
+  const { items: audioItems, loading: audioLoading } = useLibraryAudio(audioRefreshKey, audioQuery);
   const [videoRefreshKey, setVideoRefreshKey] = useState(0);
-  const { items: videoItems, loading: videoLoading } = useLibraryVideo(videoRefreshKey);
+  const [videoQuery, setVideoQuery] = useState('');
+  const { items: videoItems, loading: videoLoading } = useLibraryVideo(videoRefreshKey, videoQuery);
   const [collectionsRefreshKey, setCollectionsRefreshKey] = useState(0);
   const { items: collectionItems, loading: collectionsLoading } =
     useCollections(collectionsRefreshKey);
@@ -948,10 +956,22 @@ function App() {
       <section className="cards">
         <article>
           <h2>Audio</h2>
+          <input
+            type="search"
+            className="audio-filter"
+            placeholder="Search audio…"
+            value={audioQuery}
+            onChange={(e) => setAudioQuery(e.target.value)}
+            aria-label="Filter audio by filename"
+          />
           {audioLoading ? (
             <p>Loading audio library…</p>
           ) : audioItems.length === 0 ? (
-            <p>MP3 downloads will appear here.</p>
+            <p className="audio-empty">
+              {audioQuery.trim() !== ''
+                ? `No audio matching "${audioQuery}".`
+                : 'MP3 downloads will appear here.'}
+            </p>
           ) : (
             <ul className="audio-list">
               {audioItems.map((item) => (
@@ -980,10 +1000,22 @@ function App() {
         </article>
         <article>
           <h2>Video</h2>
+          <input
+            type="search"
+            className="video-filter"
+            placeholder="Search video…"
+            value={videoQuery}
+            onChange={(e) => setVideoQuery(e.target.value)}
+            aria-label="Filter video by filename"
+          />
           {videoLoading ? (
             <p>Loading video library…</p>
           ) : videoItems.length === 0 ? (
-            <p>MP4 downloads will appear here.</p>
+            <p className="video-empty">
+              {videoQuery.trim() !== ''
+                ? `No video matching "${videoQuery}".`
+                : 'MP4 downloads will appear here.'}
+            </p>
           ) : (
             <ul className="audio-list">
               {videoItems.map((item) => (
