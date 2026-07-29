@@ -628,3 +628,9 @@
 - Task: added `delete_collection` database helper in `apps/api/app/database.py` and `DELETE /collections/{name}` API endpoint in `apps/api/app/routes/library.py` to delete a collection and its join rows from the database with 204 No Content response and 404 for unknown collections; added unit and integration tests in `apps/api/tests/test_database.py` and `apps/api/tests/test_library.py`.
 - Verification: `cd apps/api && .\.venv\Scripts\python -m pytest` — 223 passed.
 - Next small step: add a delete collection button to the Collections card in the main web app (`apps/web/src/main.tsx`) calling `DELETE /collections/{name}`.
+
+## 2026-07-29 16:03 SEAST — Slow Builder (Delete Collection Button in Web App)
+
+- Task: added a delete collection button (`✕`) to each collection header in the Collections card in the main web app (`apps/web/src/main.tsx` + `styles.css`) calling `DELETE /collections/{name}`, handling `deleting` state, clearing `expandedCollection` if the deleted collection was active, and triggering collection list refresh + error banner reporting on failure.
+- Verification: `cd apps/web && npm run build` — clean build (0 errors, 15 modules transformed); `cd apps/api && .\.venv\Scripts\python -m pytest` — 223 passed.
+- Next small step: add `POST /library/import` API endpoint in `apps/api/app/routes/library.py` to restore metadata, tags, and collections from an exported JSON dump.

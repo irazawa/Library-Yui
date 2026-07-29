@@ -381,16 +381,42 @@ interface CollectionRowProps {
   isExpanded: boolean;
   onToggle: () => void;
   formatBytes: (bytes: number) => string;
+  onDeleteCollection: (name: string) => void;
   onError?: (msg: string) => void;
 }
 
-function CollectionRow({ collection, isExpanded, onToggle, formatBytes, onError }: CollectionRowProps) {
+function CollectionRow({
+  collection,
+  isExpanded,
+  onToggle,
+  formatBytes,
+  onDeleteCollection,
+  onError,
+}: CollectionRowProps) {
   const [itemsRefreshKey, setItemsRefreshKey] = useState(0);
   const { items, loading, error } = useCollectionItems(
     isExpanded ? collection.name : null,
     itemsRefreshKey,
   );
   const [removingId, setRemovingId] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDeleteCollection() {
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`${COLLECTIONS_URL}/${encodeURIComponent(collection.name)}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      onDeleteCollection(collection.name);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Delete collection failed';
+      onError?.(msg);
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   async function handleRemoveItem(metadataId: number) {
     if (removingId !== null) return;
@@ -437,6 +463,18 @@ function CollectionRow({ collection, isExpanded, onToggle, formatBytes, onError 
           {isExpanded ? '▼' : '▶'}
         </button>
         <span className="collection-name">{collection.name}</span>
+        <button
+          type="button"
+          className="collection-delete"
+          disabled={deleting}
+          aria-label={`Delete collection ${collection.name}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleDeleteCollection();
+          }}
+        >
+          ✕
+        </button>
       </div>
       {isExpanded && (
         <div className="collection-items-container">
@@ -1365,7 +1403,13 @@ function App() {
                     setExpandedCollection((prev) => (prev === col.name ? null : col.name))
                   }
                   formatBytes={formatBytes}
-                  onError={(msg) => setNotice(`Remove item failed: ${msg}`)}
+                  onDeleteCollection={(name) => {
+                    if (expandedCollection === name) {
+                      setExpandedCollection(null);
+                    }
+                    setCollectionsRefreshKey((k) => k + 1);
+                  }}
+                  onError={(msg) => setNotice(`Collection action failed: ${msg}`)}
                 />
               ))}
             </ul>
