@@ -656,3 +656,9 @@
 - Task: added an inline collection rename form/control (`✎` edit button, rename input, save/cancel buttons) to each collection row in the Collections card in the main web app (`apps/web/src/main.tsx` + `styles.css`) calling `POST /collections/{name}/rename`, handling optimistic UI state update, updating expanded collection state on rename, and reporting duplicate name (409) / network errors via notice banner.
 - Verification: `cd apps/web && npm run build` — clean build (0 errors, 15 modules transformed); `cd apps/api && python -m pytest` — 233 passed.
 - Next small step: update `docs/API.md` documenting `DELETE /collections/{name}`, `POST /collections/{name}/rename`, and `POST /library/import`.
+
+## 2026-07-29 21:03 SEAST — Slow Builder (API Documentation Update for MVP 7)
+
+- Task: updated `docs/API.md` with complete documentation for `POST /library/import`, `DELETE /collections/{name}`, `POST /collections/{name}/rename`, and full `Collections` endpoints (`POST/GET /collections`, `POST/GET/DELETE /collections/{name}/items`); updated OpenAPI tag summary table; marked MVP 7 batch completed and generated MVP 8 task queue in `docs/plans/slow-tasks.md`.
+- Verification: `git diff --check` — clean with zero whitespace or formatting issues; `cd apps/api && python -m pytest` — 233 passed.
+- Next small step: add `is_favorite` boolean column to `metadata` table in `apps/api/app/database.py`.

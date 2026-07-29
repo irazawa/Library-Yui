@@ -10,9 +10,9 @@ as sections in the interactive docs (`/docs`, `/redoc`):
 | Tag           | Scope                                                                  |
 | ------------- | ---------------------------------------------------------------------- |
 | `System`      | Liveness probes, version, and runtime config (`/health`, `/version`, `/config`). |
-| `Jobs`        | Download job lifecycle (`/jobs`, `/jobs/{id}`, `/jobs/{id}/start`, `/jobs/{id}/complete`, `DELETE /jobs/completed`, `DELETE /jobs/{id}`). |
-| `Library`     | Library listing, streaming, audio/video deletion, uploads, thumbnails, storage usage, export, and summary. |
-| `Collections` | Tags, per-item metadata, and metadata deletion (tag assignment, search filters, metadata detail, `DELETE /library/metadata/{id}`). |
+| `Jobs`        | Download job lifecycle (`/jobs`, `/jobs/{id}`, `/jobs/{id}/start`, `DELETE /jobs/completed`, `DELETE /jobs/{id}`). |
+| `Library`     | Library listing, streaming, audio/video deletion, uploads, thumbnails, storage usage, export, import, and summary. |
+| `Collections` | Collections management and item membership (`POST/GET/DELETE /collections`, `POST /collections/{name}/rename`, `POST/GET/DELETE /collections/{name}/items`). |
 
 ## `GET /health`
 
@@ -206,6 +206,71 @@ Returns empty arrays for database-backed entities when the database file does no
 
 ```bash
 curl http://127.0.0.1:8787/library/export
+```
+
+## `POST /library/import`
+
+Restores metadata, tags, collections, and download jobs from an exported JSON dump (such as produced by `GET /library/export`).
+
+### Request body
+
+```json
+{
+  "metadata": [
+    {
+      "id": 1,
+      "filename": "track.mp3",
+      "path": "library/uploads/track.mp3",
+      "size": 10240,
+      "content_type": "audio/mpeg",
+      "uploaded_at": "2026-07-29T10:00:00Z",
+      "tags": ["rock"]
+    }
+  ],
+  "tags": ["rock", "synth"],
+  "collections": ["Favorites"],
+  "jobs": [
+    {
+      "id": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+      "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "status": "completed",
+      "mode": "audio"
+    }
+  ]
+}
+```
+
+| Field         | Type  | Description                                                           |
+| ------------- | ----- | --------------------------------------------------------------------- |
+| `metadata`    | array | Optional list of item metadata objects to restore.                    |
+| `tags`        | array | Optional list of tag names to register in the tags table.             |
+| `collections` | array | Optional list of collection names or collection objects to restore.   |
+| `jobs`        | array | Optional list of download job objects to restore.                     |
+
+### Response — `200 OK`
+
+```json
+{
+  "imported_metadata": 1,
+  "imported_tags": 2,
+  "imported_collections": 1,
+  "imported_jobs": 1
+}
+```
+
+| Field                  | Type    | Description                                            |
+| ---------------------- | ------- | ------------------------------------------------------ |
+| `imported_metadata`    | integer | Total metadata records imported.                       |
+| `imported_tags`        | integer | Total tags processed/inserted.                         |
+| `imported_collections` | integer | Total collections processed/inserted.                  |
+| `imported_jobs`        | integer | Total download jobs restored.                          |
+
+### Example
+
+```bash
+curl -X POST http://127.0.0.1:8787/library/import \
+  -H "Content-Type: application/json" \
+  -d @library-export.json
 ```
 
 ## `GET /library/audio`
@@ -755,6 +820,304 @@ Returned when the database file does not exist yet or no row matches the id.
 
 ```bash
 curl -X DELETE http://127.0.0.1:8787/library/metadata/3
+```
+
+## `POST /collections`
+
+Creates a named collection in the database.
+
+### Request body
+
+```json
+{
+  "name": "Favorites"
+}
+```
+
+| Field  | Type   | Description                            |
+| ------ | ------ | -------------------------------------- |
+| `name` | string | The name of the collection to create.  |
+
+### Response — `201 Created`
+
+```json
+{
+  "id": 1,
+  "name": "Favorites"
+}
+```
+
+| Field  | Type    | Description                   |
+| ------ | ------- | ----------------------------- |
+| `id`   | integer | Unique collection row id.     |
+| `name` | string  | Collection name.              |
+
+### Response — `409 Conflict`
+
+Returned when a collection with the given name already exists.
+
+### Response — `422 Unprocessable Entity`
+
+Returned when `name` is empty or missing.
+
+### Example
+
+```bash
+curl -X POST http://127.0.0.1:8787/collections \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Favorites"}'
+```
+
+## `GET /collections`
+
+Returns all collections sorted alphabetically by name.
+
+### Response — `200 OK`
+
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "name": "Favorites"
+    }
+  ]
+}
+```
+
+| Field   | Type  | Description                                |
+| ------- | ----- | ------------------------------------------ |
+| `items` | array | List of collection objects (`id`, `name`). |
+
+### Example
+
+```bash
+curl http://127.0.0.1:8787/collections
+```
+
+## `DELETE /collections/{name}`
+
+Deletes a collection by name and removes all of its associated item memberships from the database.
+
+### Path parameters
+
+| Parameter | Type   | Description                       |
+| --------- | ------ | --------------------------------- |
+| `name`    | string | Name of the collection to delete. |
+
+### Response — `204 No Content`
+
+Empty body. The collection and its join rows have been removed.
+
+### Response — `404 Not Found`
+
+Returned when no collection matches the given name.
+
+```json
+{
+  "detail": "Collection not found"
+}
+```
+
+### Example
+
+```bash
+curl -X DELETE http://127.0.0.1:8787/collections/Favorites
+```
+
+## `POST /collections/{name}/rename`
+
+Renames an existing collection from `name` to a new name specified in the request body.
+
+### Path parameters
+
+| Parameter | Type   | Description                               |
+| --------- | ------ | ----------------------------------------- |
+| `name`    | string | Current name of the collection to rename. |
+
+### Request body
+
+```json
+{
+  "new_name": "Best Songs"
+}
+```
+
+| Field      | Type   | Description                                  |
+| ---------- | ------ | -------------------------------------------- |
+| `new_name` | string | The new name for the collection (non-empty). |
+
+### Response — `200 OK`
+
+```json
+{
+  "id": 1,
+  "name": "Best Songs"
+}
+```
+
+| Field  | Type    | Description                   |
+| ------ | ------- | ----------------------------- |
+| `id`   | integer | Unique collection row id.     |
+| `name` | string  | Updated collection name.      |
+
+### Response — `404 Not Found`
+
+Returned when the target collection does not exist.
+
+```json
+{
+  "detail": "Collection not found"
+}
+```
+
+### Response — `409 Conflict`
+
+Returned when `new_name` collides with an existing collection.
+
+```json
+{
+  "detail": "A collection with that name already exists"
+}
+```
+
+### Response — `422 Unprocessable Entity`
+
+Returned when `new_name` is blank or omitted.
+
+```json
+{
+  "detail": "collection name must be a non-empty string"
+}
+```
+
+### Example
+
+```bash
+curl -X POST http://127.0.0.1:8787/collections/Favorites/rename \
+  -H "Content-Type: application/json" \
+  -d '{"new_name": "Best Songs"}'
+```
+
+## `POST /collections/{name}/items`
+
+Adds an uploaded item (by `metadata_id`) to a collection. Idempotent: adding an item that is already in the collection is a no-op.
+
+### Path parameters
+
+| Parameter | Type   | Description                                |
+| --------- | ------ | ------------------------------------------ |
+| `name`    | string | Name of the collection to add the item to. |
+
+### Request body
+
+```json
+{
+  "metadata_id": 1
+}
+```
+
+| Field         | Type    | Description                             |
+| ------------- | ------- | --------------------------------------- |
+| `metadata_id` | integer | The ID of the uploaded metadata record. |
+
+### Response — `201 Created`
+
+```json
+{
+  "collection": {
+    "id": 1,
+    "name": "Favorites"
+  },
+  "items": [
+    {
+      "id": 1,
+      "filename": "track.mp3",
+      "path": "library/uploads/track.mp3",
+      "size": 10240,
+      "content_type": "audio/mpeg",
+      "uploaded_at": "2026-07-29T10:00:00Z"
+    }
+  ]
+}
+```
+
+### Response — `404 Not Found`
+
+Returned when the collection or metadata record is not found.
+
+### Example
+
+```bash
+curl -X POST http://127.0.0.1:8787/collections/Favorites/items \
+  -H "Content-Type: application/json" \
+  -d '{"metadata_id": 1}'
+```
+
+## `GET /collections/{name}/items`
+
+Lists all items in a collection, newest first.
+
+### Path parameters
+
+| Parameter | Type   | Description                        |
+| --------- | ------ | ---------------------------------- |
+| `name`    | string | Name of the collection to inspect. |
+
+### Response — `200 OK`
+
+```json
+{
+  "collection": {
+    "id": 1,
+    "name": "Favorites"
+  },
+  "items": [
+    {
+      "id": 1,
+      "filename": "track.mp3",
+      "path": "library/uploads/track.mp3",
+      "size": 10240,
+      "content_type": "audio/mpeg",
+      "uploaded_at": "2026-07-29T10:00:00Z"
+    }
+  ]
+}
+```
+
+### Response — `404 Not Found`
+
+Returned when the collection does not exist.
+
+### Example
+
+```bash
+curl http://127.0.0.1:8787/collections/Favorites/items
+```
+
+## `DELETE /collections/{name}/items/{metadata_id}`
+
+Removes an item from a collection. Idempotent: removing an item that is not in the collection is a no-op.
+
+### Path parameters
+
+| Parameter     | Type    | Description                                     |
+| ------------- | ------- | ----------------------------------------------- |
+| `name`        | string  | Name of the collection.                         |
+| `metadata_id` | integer | The ID of the uploaded metadata item to remove. |
+
+### Response — `200 OK`
+
+Returns the collection object and its remaining item list.
+
+### Response — `404 Not Found`
+
+Returned when the collection does not exist.
+
+### Example
+
+```bash
+curl -X DELETE http://127.0.0.1:8787/collections/Favorites/items/1
 ```
 
 ## Notes

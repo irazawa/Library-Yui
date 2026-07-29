@@ -207,4 +207,18 @@ Each task is small, self-contained, and verifiable with a single `pytest` run
 - [x] Add an "Import JSON" button & file selector in main web app (`apps/web/src/main.tsx`) calling `POST /library/import`; verify with `npm run build` in `apps/web`.
 - [x] Add `POST /collections/{name}/rename` API endpoint in `apps/api/app/routes/library.py` updating a collection's name; add tests in `tests/test_library.py`.
 - [x] Add inline collection rename form/control in main web app (`apps/web/src/main.tsx`); verify with `npm run build` in `apps/web`.
-- [ ] Update `docs/API.md` documenting `DELETE /collections/{name}`, `POST /collections/{name}/rename`, and `POST /library/import`; verify with `git diff --check`.
+- [x] Update `docs/API.md` documenting `DELETE /collections/{name}`, `POST /collections/{name}/rename`, and `POST /library/import`; verify with `git diff --check`.
+
+## Next batch (generated 2026-07-29 via Yui slow builder)
+
+MVP 8 (Media Polish, Audio Player Features & System Metrics).
+Each task is small, self-contained, and verifiable with a single `pytest` run
+(backend), `npm run build` (frontend), or `git diff --check` (docs).
+
+- [ ] Add `is_favorite` boolean column (default 0) to `metadata` table in `apps/api/app/database.py` with migration handling for existing DBs; add unit tests in `tests/test_database.py`.
+- [ ] Add `POST /library/metadata/{id}/favorite` endpoint toggling `is_favorite` status in `apps/api/app/routes/library.py`; add tests in `tests/test_library.py`.
+- [ ] Add a favorite heart button (`♥`) on items in the Uploads card in `apps/web/src/main.tsx` calling `POST /library/metadata/{id}/favorite`; verify with `npm run build` in `apps/web`.
+- [ ] Add next/previous track skip controls and shuffle toggle to the persistent audio player in `apps/web/src/main.tsx`; verify with `npm run build` in `apps/web`.
+- [ ] Add `GET /system/info` endpoint in `apps/api/app/routes/health.py` returning Python version, OS platform, process uptime, and database size; add tests in `tests/test_health.py`.
+- [ ] Add a System Information card to the status dashboard (`apps/status/src/main.tsx`) displaying backend runtime info from `GET /system/info`; verify with `npm run build` in `apps/status`.
+- [ ] Update `docs/API.md` documenting `POST /library/metadata/{id}/favorite` and `GET /system/info`; verify with `git diff --check`.
