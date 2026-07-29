@@ -1011,6 +1011,8 @@ function App() {
   }
 
   const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const importFileInputRef = useRef<HTMLInputElement | null>(null);
 
   async function handleExportLibrary() {
     if (exporting) return;
@@ -1033,6 +1035,46 @@ function App() {
       setNotice(`Export library failed: ${msg}`);
     } finally {
       setExporting(false);
+    }
+  }
+
+  async function handleImportSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || importing) return;
+    setImporting(true);
+    try {
+      const text = await file.text();
+      let payload: unknown;
+      try {
+        payload = JSON.parse(text);
+      } catch {
+        throw new Error('Invalid JSON file format');
+      }
+      const res = await fetch(`${API_BASE_URL}/library/import`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await res.json()) as {
+        imported_metadata: number;
+        imported_tags: number;
+        imported_collections: number;
+        imported_jobs: number;
+      };
+      setNotice(
+        `Import complete: ${data.imported_metadata} metadata, ${data.imported_tags} tags, ${data.imported_collections} collections, ${data.imported_jobs} jobs restored.`,
+      );
+      setCollectionsRefreshKey((k) => k + 1);
+      setUploadsRefreshKey((k) => k + 1);
+      setAudioRefreshKey((k) => k + 1);
+      setVideoRefreshKey((k) => k + 1);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Import failed';
+      setNotice(`Import library failed: ${msg}`);
+    } finally {
+      setImporting(false);
+      if (importFileInputRef.current) importFileInputRef.current.value = '';
     }
   }
 
@@ -1113,6 +1155,23 @@ function App() {
             aria-label="Export library metadata JSON"
           >
             {exporting ? 'Exporting…' : 'Export JSON'}
+          </button>
+          <input
+            ref={importFileInputRef}
+            type="file"
+            accept=".json,application/json"
+            onChange={handleImportSelected}
+            aria-label="Import library metadata JSON file"
+            style={{ display: 'none' }}
+          />
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => importFileInputRef.current?.click()}
+            disabled={importing}
+            aria-label="Import library metadata JSON"
+          >
+            {importing ? 'Importing…' : 'Import JSON'}
           </button>
         </form>
         {jobId && (

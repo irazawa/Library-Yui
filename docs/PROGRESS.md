@@ -640,3 +640,10 @@
 - Task: added `import_metadata` helper in `apps/api/app/database.py`, `import_job` helper in `apps/api/app/jobs.py`, and `POST /library/import` API endpoint in `apps/api/app/routes/library.py` to restore metadata, tags, collections, and jobs from an exported JSON dump with response counts (`imported_metadata`, `imported_tags`, `imported_collections`, `imported_jobs`); added unit and integration tests in `apps/api/tests/test_library.py`.
 - Verification: `cd apps/api && .\.venv\Scripts\python -m pytest` — 225 passed.
 - Next small step: add an "Import JSON" button & file selector in main web app (`apps/web/src/main.tsx`) calling `POST /library/import`.
+
+## 2026-07-29 18:03 SEAST — Slow Builder (Import JSON Button in Web App)
+
+- Task: added an "Import JSON" button & hidden file input selector to the hero section in main web app (`apps/web/src/main.tsx`) calling `POST /library/import`, parsing JSON file content, surfacing detailed restored counts (metadata, tags, collections, jobs) in notice banner, and triggering UI state refresh on success.
+- Verification: `cd apps/web && npm run build` — clean build (0 errors, 15 modules transformed); `cd apps/api && py -3.14 -m pytest` — 225 passed.
+- Next small step: add `POST /collections/{name}/rename` API endpoint in `apps/api/app/routes/library.py` updating a collection's name.
+
