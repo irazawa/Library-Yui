@@ -195,3 +195,16 @@ Each task is small, self-contained, and verifiable with a single `pytest` run
 - [x] Add `GET /library/export` endpoint in `apps/api/app/routes/library.py` returning a JSON dump of all metadata, tags, collections, and jobs; add tests in `tests/test_library.py`.
 - [x] Update `docs/API.md` documenting `DELETE /jobs/completed`, `GET /library/export`, and `?q=` search params on audio/video endpoints; verify with `git diff --check`.
 
+## Next batch (generated 2026-07-29 via Yui slow builder)
+
+MVP 7 (Collection Management & Data Backup/Restore).
+Each task is small, self-contained, and verifiable with a single `pytest` run
+(backend), `npm run build` (frontend), or `git diff --check` (docs).
+
+- [ ] Add `DELETE /collections/{name}` API endpoint in `apps/api/app/routes/library.py` to delete a collection and its join rows from the database; add tests in `tests/test_library.py`.
+- [ ] Add a delete collection button to the Collections card in the main web app (`apps/web/src/main.tsx`) calling `DELETE /collections/{name}`; verify with `npm run build` in `apps/web`.
+- [ ] Add `POST /library/import` API endpoint in `apps/api/app/routes/library.py` to restore metadata, tags, and collections from an exported JSON dump; add tests in `tests/test_library.py`.
+- [ ] Add an "Import JSON" button & file selector in main web app (`apps/web/src/main.tsx`) calling `POST /library/import`; verify with `npm run build` in `apps/web`.
+- [ ] Add `POST /collections/{name}/rename` API endpoint in `apps/api/app/routes/library.py` updating a collection's name; add tests in `tests/test_library.py`.
+- [ ] Add inline collection rename form/control in main web app (`apps/web/src/main.tsx`); verify with `npm run build` in `apps/web`.
+- [ ] Update `docs/API.md` documenting `DELETE /collections/{name}`, `POST /collections/{name}/rename`, and `POST /library/import`; verify with `git diff --check`.

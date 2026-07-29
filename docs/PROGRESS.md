@@ -616,3 +616,9 @@
 - Task: added "Export JSON" button to the main web app hero section (`apps/web/src/main.tsx`) calling `GET /library/export`, creating a JSON blob, and triggering a file download (`library-export-YYYY-MM-DD.json`) with error notice reporting and button loading state (`Exporting…`).
 - Verification: `cd apps/web && npm run build` — clean build (0 errors, 15 modules transformed); `cd apps/api && .\.venv\Scripts\python -m pytest` — 219 passed.
 - Next small step: plan the next batch of features for MVP 7.
+
+## 2026-07-29 14:03 SEAST — Slow Builder (MVP 7 Plan Refresh)
+
+- Task: all previous slow-tasks in queue were completed; generated the next batch of 7 tiny tasks targeting MVP 7 (Collection Management & Data Backup/Restore: `DELETE /collections/{name}`, `POST /collections/{name}/rename`, `POST /library/import`, and corresponding frontend UI controls + API docs update) and merged into `docs/plans/slow-tasks.md`.
+- Verification: `git diff --check` — clean with zero whitespace or formatting issues.
+- Next small step: add `DELETE /collections/{name}` API endpoint in `apps/api/app/routes/library.py` to delete a collection and its join rows from the database.
