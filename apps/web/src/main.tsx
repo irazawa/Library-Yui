@@ -382,6 +382,7 @@ interface CollectionRowProps {
   onToggle: () => void;
   formatBytes: (bytes: number) => string;
   onDeleteCollection: (name: string) => void;
+  onRenameCollection: (oldName: string, newName: string) => void;
   onError?: (msg: string) => void;
 }
 
@@ -391,6 +392,7 @@ function CollectionRow({
   onToggle,
   formatBytes,
   onDeleteCollection,
+  onRenameCollection,
   onError,
 }: CollectionRowProps) {
   const [itemsRefreshKey, setItemsRefreshKey] = useState(0);
@@ -400,6 +402,37 @@ function CollectionRow({
   );
   const [removingId, setRemovingId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [renameValue, setRenameValue] = useState(collection.name);
+  const [renaming, setRenaming] = useState(false);
+
+  async function handleRenameCollection() {
+    const newName = renameValue.trim();
+    if (!newName || newName === collection.name || renaming) return;
+    setRenaming(true);
+    try {
+      const res = await fetch(
+        `${COLLECTIONS_URL}/${encodeURIComponent(collection.name)}/rename`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ new_name: newName }),
+        },
+      );
+      if (!res.ok) {
+        if (res.status === 409) throw new Error('A collection with that name already exists');
+        throw new Error(`HTTP ${res.status}`);
+      }
+      const updated = (await res.json()) as CollectionItem;
+      setIsEditing(false);
+      onRenameCollection(collection.name, updated.name);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Rename collection failed';
+      onError?.(msg);
+    } finally {
+      setRenaming(false);
+    }
+  }
 
   async function handleDeleteCollection() {
     if (deleting) return;
@@ -462,19 +495,74 @@ function CollectionRow({
         >
           {isExpanded ? '▼' : '▶'}
         </button>
-        <span className="collection-name">{collection.name}</span>
-        <button
-          type="button"
-          className="collection-delete"
-          disabled={deleting}
-          aria-label={`Delete collection ${collection.name}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            handleDeleteCollection();
-          }}
-        >
-          ✕
-        </button>
+        {isEditing ? (
+          <form
+            className="collection-rename-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleRenameCollection();
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <input
+              type="text"
+              className="collection-rename-input"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              disabled={renaming}
+              autoFocus
+              aria-label={`Rename collection ${collection.name}`}
+            />
+            <button
+              type="submit"
+              className="collection-rename-save"
+              disabled={renaming || renameValue.trim() === '' || renameValue.trim() === collection.name}
+            >
+              {renaming ? '…' : 'Save'}
+            </button>
+            <button
+              type="button"
+              className="collection-rename-cancel"
+              disabled={renaming}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsEditing(false);
+                setRenameValue(collection.name);
+              }}
+            >
+              Cancel
+            </button>
+          </form>
+        ) : (
+          <>
+            <span className="collection-name">{collection.name}</span>
+            <button
+              type="button"
+              className="collection-rename-btn"
+              aria-label={`Rename collection ${collection.name}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsEditing(true);
+                setRenameValue(collection.name);
+              }}
+            >
+              ✎
+            </button>
+            <button
+              type="button"
+              className="collection-delete"
+              disabled={deleting}
+              aria-label={`Delete collection ${collection.name}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteCollection();
+              }}
+            >
+              ✕
+            </button>
+          </>
+        )}
       </div>
       {isExpanded && (
         <div className="collection-items-container">
@@ -1465,6 +1553,12 @@ function App() {
                   onDeleteCollection={(name) => {
                     if (expandedCollection === name) {
                       setExpandedCollection(null);
+                    }
+                    setCollectionsRefreshKey((k) => k + 1);
+                  }}
+                  onRenameCollection={(oldName, newName) => {
+                    if (expandedCollection === oldName) {
+                      setExpandedCollection(newName);
                     }
                     setCollectionsRefreshKey((k) => k + 1);
                   }}

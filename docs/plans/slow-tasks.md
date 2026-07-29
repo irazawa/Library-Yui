@@ -206,5 +206,5 @@ Each task is small, self-contained, and verifiable with a single `pytest` run
 - [x] Add `POST /library/import` API endpoint in `apps/api/app/routes/library.py` to restore metadata, tags, and collections from an exported JSON dump; add tests in `tests/test_library.py`.
 - [x] Add an "Import JSON" button & file selector in main web app (`apps/web/src/main.tsx`) calling `POST /library/import`; verify with `npm run build` in `apps/web`.
 - [x] Add `POST /collections/{name}/rename` API endpoint in `apps/api/app/routes/library.py` updating a collection's name; add tests in `tests/test_library.py`.
-- [ ] Add inline collection rename form/control in main web app (`apps/web/src/main.tsx`); verify with `npm run build` in `apps/web`.
+- [x] Add inline collection rename form/control in main web app (`apps/web/src/main.tsx`); verify with `npm run build` in `apps/web`.
 - [ ] Update `docs/API.md` documenting `DELETE /collections/{name}`, `POST /collections/{name}/rename`, and `POST /library/import`; verify with `git diff --check`.

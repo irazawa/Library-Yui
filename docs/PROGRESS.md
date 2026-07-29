@@ -651,6 +651,8 @@
 
 - Task: added `rename_collection` database helper in `apps/api/app/database.py` and `POST /collections/{name}/rename` API endpoint in `apps/api/app/routes/library.py` (with `CollectionRenameRequest` body `{new_name}`) returning 200 with updated collection object, 404 when collection is missing, 422 for blank new_name, and 409 when new_name collides with an existing collection; added unit tests in `apps/api/tests/test_database.py` and integration tests in `apps/api/tests/test_library.py`.
 - Verification: `python -m pytest tests` in `apps/api` — 233 passed.
-- Next small step: add inline collection rename form/control in main web app (`apps/web/src/main.tsx`).
+## 2026-07-29 20:03 SEAST — Slow Builder (Inline Collection Rename UI in Web App)
 
-
+- Task: added an inline collection rename form/control (`✎` edit button, rename input, save/cancel buttons) to each collection row in the Collections card in the main web app (`apps/web/src/main.tsx` + `styles.css`) calling `POST /collections/{name}/rename`, handling optimistic UI state update, updating expanded collection state on rename, and reporting duplicate name (409) / network errors via notice banner.
+- Verification: `cd apps/web && npm run build` — clean build (0 errors, 15 modules transformed); `cd apps/api && python -m pytest` — 233 passed.
+- Next small step: update `docs/API.md` documenting `DELETE /collections/{name}`, `POST /collections/{name}/rename`, and `POST /library/import`.
