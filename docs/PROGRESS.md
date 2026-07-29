@@ -611,5 +611,8 @@
 
 - Task: updated `docs/API.md` with complete documentation for `DELETE /jobs/completed`, `GET /library/export`, `GET /library/video`, and the optional search query parameter `?q=` on `GET /library/audio` and `GET /library/video`; updated tag summary table and verified all examples with `git diff --check`.
 - Verification: `git diff --check` — clean with zero whitespace or formatting issues; `cd apps/api && .\.venv\Scripts\python -m pytest` — 219 passed.
-- Next small step: plan the next batch of features for MVP 7.
+## 2026-07-29 13:03 SEAST — Slow Builder (Export Library JSON Button in Web App)
 
+- Task: added "Export JSON" button to the main web app hero section (`apps/web/src/main.tsx`) calling `GET /library/export`, creating a JSON blob, and triggering a file download (`library-export-YYYY-MM-DD.json`) with error notice reporting and button loading state (`Exporting…`).
+- Verification: `cd apps/web && npm run build` — clean build (0 errors, 15 modules transformed); `cd apps/api && .\.venv\Scripts\python -m pytest` — 219 passed.
+- Next small step: plan the next batch of features for MVP 7.

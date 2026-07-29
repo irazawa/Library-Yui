@@ -972,6 +972,32 @@ function App() {
     }
   }
 
+  const [exporting, setExporting] = useState(false);
+
+  async function handleExportLibrary() {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/library/export`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const exportUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = exportUrl;
+      a.download = `library-export-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(exportUrl);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Export failed';
+      setNotice(`Export library failed: ${msg}`);
+    } finally {
+      setExporting(false);
+    }
+  }
+
   const dash = state === 'loading' ? '…' : '—';
   const audio = state === 'ok' && summary ? String(summary.audio) : dash;
   const video = state === 'ok' && summary ? String(summary.video) : dash;
@@ -1040,6 +1066,15 @@ function App() {
           />
           <button type="submit" disabled={submitting}>
             {submitting ? 'Submitting…' : 'Download MP3'}
+          </button>
+          <button
+            type="button"
+            className="secondary"
+            onClick={handleExportLibrary}
+            disabled={exporting}
+            aria-label="Export library metadata JSON"
+          >
+            {exporting ? 'Exporting…' : 'Export JSON'}
           </button>
         </form>
         {jobId && (
