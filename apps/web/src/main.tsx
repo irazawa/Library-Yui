@@ -92,6 +92,11 @@ interface CollectionListResponse {
   items: CollectionItem[];
 }
 
+interface CollectionItemsResponse {
+  collection: CollectionItem;
+  items: UploadItem[];
+}
+
 /**
  * Poll `GET /jobs/{id}` on an interval until the job reaches a terminal
  * status (completed/failed) or polling is cleared. Returns the latest known
@@ -326,6 +331,111 @@ function useCollections(refreshKey: number = 0) {
   }, [refreshKey]);
 
   return { items, loading };
+}
+
+/**
+ * Fetch the items inside a collection via `GET /collections/{name}/items`.
+ * Active only when `name` is non-null. Returns items, loading, and error states.
+ */
+function useCollectionItems(name: string | null, refreshKey: number = 0) {
+  const [items, setItems] = useState<UploadItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!name) {
+      setItems([]);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    fetch(`${COLLECTIONS_URL}/${encodeURIComponent(name)}/items`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = (await res.json()) as CollectionItemsResponse;
+        if (cancelled) return;
+        setItems(data.items);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setItems([]);
+        setError(err instanceof Error ? err.message : 'Failed to load items');
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [name, refreshKey]);
+
+  return { items, loading, error };
+}
+
+interface CollectionRowProps {
+  collection: CollectionItem;
+  isExpanded: boolean;
+  onToggle: () => void;
+  formatBytes: (bytes: number) => string;
+}
+
+function CollectionRow({ collection, isExpanded, onToggle, formatBytes }: CollectionRowProps) {
+  const { items, loading, error } = useCollectionItems(isExpanded ? collection.name : null);
+
+  return (
+    <li className={`collection-item ${isExpanded ? 'collection-item-expanded' : ''}`}>
+      <div
+        className="collection-item-header"
+        onClick={onToggle}
+        role="button"
+        tabIndex={0}
+        aria-expanded={isExpanded}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onToggle();
+          }
+        }}
+      >
+        <button
+          type="button"
+          className="collection-toggle"
+          aria-label={isExpanded ? `Collapse collection ${collection.name}` : `Expand collection ${collection.name}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle();
+          }}
+        >
+          {isExpanded ? '▼' : '▶'}
+        </button>
+        <span className="collection-name">{collection.name}</span>
+      </div>
+      {isExpanded && (
+        <div className="collection-items-container">
+          {loading ? (
+            <p className="collection-items-note">Loading items…</p>
+          ) : error ? (
+            <p className="collection-items-note collection-items-error">{error}</p>
+          ) : items.length === 0 ? (
+            <p className="collection-items-note">No items in this collection.</p>
+          ) : (
+            <ul className="collection-sub-list">
+              {items.map((item) => (
+                <li key={item.id} className="collection-sub-item">
+                  <span className="collection-sub-item-name">{item.filename}</span>
+                  <span className="collection-sub-item-meta">{formatBytes(item.size)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </li>
+  );
 }
 
 function useLibraryUploads(refreshKey: number, tag: string = '') {
@@ -639,6 +749,7 @@ function App() {
   const [collectionsRefreshKey, setCollectionsRefreshKey] = useState(0);
   const { items: collectionItems, loading: collectionsLoading } =
     useCollections(collectionsRefreshKey);
+  const [expandedCollection, setExpandedCollection] = useState<string | null>(null);
   const [newCollectionName, setNewCollectionName] = useState('');
   const [creatingCollection, setCreatingCollection] = useState(false);
   const [activeVideo, setActiveVideo] = useState<VideoItem | null>(null);
@@ -1169,9 +1280,15 @@ function App() {
           ) : (
             <ul className="audio-list">
               {collectionItems.map((col) => (
-                <li key={col.id} className="collection-item">
-                  <span className="collection-name">{col.name}</span>
-                </li>
+                <CollectionRow
+                  key={col.id}
+                  collection={col}
+                  isExpanded={expandedCollection === col.name}
+                  onToggle={() =>
+                    setExpandedCollection((prev) => (prev === col.name ? null : col.name))
+                  }
+                  formatBytes={formatBytes}
+                />
               ))}
             </ul>
           )}

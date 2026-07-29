@@ -588,3 +588,10 @@
 - Task: added search inputs to the Audio and Video cards in the main web app (`apps/web/src/main.tsx` + `styles.css`) filtering library items via `?q=` query parameters passed to `useLibraryAudio` and `useLibraryVideo` hooks; added empty matching state text (`No audio matching "..."`, `No video matching "..."`) when queries return no items.
 - Verification: `cd apps/web && npm run build` — clean build (0 errors, 15 modules transformed); `cd apps/api && .\.venv\Scripts\python -m pytest` — 217 passed.
 - Next small step: expand Collections card in main web app (`apps/web/src/main.tsx`) to show items inside an expanded collection fetched from `GET /collections/{name}/items`.
+
+## 2026-07-29 09:03 SEAST — Slow Builder (Expand Collections Card in Web App)
+
+- Task: expanded Collections card in main web app (`apps/web/src/main.tsx` + `styles.css`) to show items inside an expanded collection — added `useCollectionItems` hook fetching `GET /collections/{name}/items`, `CollectionRow` component with toggle control (`▶` / `▼`), and list display for collection sub-items with loading, error, and empty state support.
+- Verification: `cd apps/web && npm run build` — clean build (0 errors, 15 modules transformed); `cd apps/api && .\.venv\Scripts\python -m pytest` — 217 passed.
+- Next small step: add a remove button for collection items in main web app calling `DELETE /collections/{name}/items/{metadata_id}`.
+
