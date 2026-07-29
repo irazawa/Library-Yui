@@ -49,6 +49,22 @@ def test_library_audio_returns_empty_when_directory_missing(monkeypatch, tmp_pat
     assert response.json() == {"items": []}
 
 
+def test_library_audio_filters_by_query(monkeypatch, tmp_path):
+    fake_audio = tmp_path / "audio"
+    fake_audio.mkdir()
+    (fake_audio / "rock_track.mp3").write_bytes(b"\x00")
+    (fake_audio / "pop_song.mp3").write_bytes(b"\x00")
+    (fake_audio / "jazz_rock.mp3").write_bytes(b"\x00")
+
+    monkeypatch.setattr(library_route, "AUDIO_DIR", fake_audio)
+
+    response = client.get("/library/audio?q=ROCK")
+
+    assert response.status_code == 200
+    names = [item["name"] for item in response.json()["items"]]
+    assert names == ["jazz_rock.mp3", "rock_track.mp3"]
+
+
 def test_library_audio_returns_duration_from_container_header(
     monkeypatch, tmp_path
 ):
@@ -127,6 +143,22 @@ def test_library_video_returns_empty_when_directory_missing(monkeypatch, tmp_pat
 
     assert response.status_code == 200
     assert response.json() == {"items": []}
+
+
+def test_library_video_filters_by_query(monkeypatch, tmp_path):
+    fake_video = tmp_path / "video"
+    fake_video.mkdir()
+    (fake_video / "demo_clip.mp4").write_bytes(b"\x00")
+    (fake_video / "intro.mp4").write_bytes(b"\x00")
+    (fake_video / "clip_final.mp4").write_bytes(b"\x00")
+
+    monkeypatch.setattr(library_route, "VIDEO_DIR", fake_video)
+
+    response = client.get("/library/video?q=CLIP")
+
+    assert response.status_code == 200
+    names = [item["name"] for item in response.json()["items"]]
+    assert names == ["clip_final.mp4", "demo_clip.mp4"]
 
 
 def _make_minimal_mp4(duration_seconds: float, timescale: int = 1000) -> bytes:

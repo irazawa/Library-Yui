@@ -285,7 +285,7 @@ def get_library_storage() -> StorageUsageResponse:
 
 
 @router.get("/library/audio", response_model=AudioListResponse, tags=["Library"])
-def list_audio() -> AudioListResponse:
+def list_audio(q: str | None = None) -> AudioListResponse:
     """Return the names of MP3 files in the audio library folder.
 
     Each item includes its file size in bytes and a best-effort duration in
@@ -293,6 +293,8 @@ def list_audio() -> AudioListResponse:
     present (some MP3 files are muxed in an MP4 container) and falls back to
     ``None`` otherwise — it never raises. Missing directories return an empty
     list so the endpoint works before any downloads have happened.
+
+    Optional query param ``q`` filters items by filename (case-insensitive substring).
     """
 
     if not AUDIO_DIR.is_dir():
@@ -301,6 +303,8 @@ def list_audio() -> AudioListResponse:
     items: list[AudioItem] = []
     for entry in sorted(AUDIO_DIR.iterdir()):
         if not (entry.is_file() and entry.suffix.lower() == ".mp3"):
+            continue
+        if q and q.lower() not in entry.name.lower():
             continue
         try:
             size = entry.stat().st_size
@@ -312,13 +316,15 @@ def list_audio() -> AudioListResponse:
 
 
 @router.get("/library/video", response_model=VideoListResponse, tags=["Library"])
-def list_video() -> VideoListResponse:
+def list_video(q: str | None = None) -> VideoListResponse:
     """Return the names of MP4 files in the video library folder.
 
     Each item includes its file size in bytes and the container-decoded
     duration in seconds when the MP4 header can be parsed best-effort.
     Missing directories return an empty list so the endpoint works before
     any downloads have happened.
+
+    Optional query param ``q`` filters items by filename (case-insensitive substring).
     """
 
     if not VIDEO_DIR.is_dir():
@@ -327,6 +333,8 @@ def list_video() -> VideoListResponse:
     items: list[VideoItem] = []
     for entry in sorted(VIDEO_DIR.iterdir()):
         if not (entry.is_file() and entry.suffix.lower() == ".mp4"):
+            continue
+        if q and q.lower() not in entry.name.lower():
             continue
         try:
             size = entry.stat().st_size

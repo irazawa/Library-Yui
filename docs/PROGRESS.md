@@ -577,7 +577,8 @@
 ## 2026-07-29 06:03 SEAST — Slow Builder (Clear Completed Jobs Button in Status Dashboard)
 
 - Task: added a "Clear completed jobs" button to the Jobs card in the status dashboard (`apps/status/src/main.tsx` + `styles.css`) calling `DELETE /jobs/completed`, displaying button state (`Clearing…`, disabled when no finished/failed jobs), error feedback, and triggering a list refetch on success.
-- Verification: `cd apps/status && npm run build` — clean build (0 errors, 15 modules transformed); `cd apps/api && .\.venv\Scripts\python -m pytest` — 215 passed.
-- Next small step: add search query parameter `?q=` filtering to `GET /library/audio` and `GET /library/video` endpoints in `apps/api/app/routes/library.py`.
+## 2026-07-29 07:03 SEAST — Slow Builder (Library Search Query Param ?q=)
 
-
+- Task: added optional `?q=` query parameter filtering (case-insensitive filename substring search) to `GET /library/audio` and `GET /library/video` endpoints in `apps/api/app/routes/library.py`; added unit tests in `apps/api/tests/test_library.py` (`test_library_audio_filters_by_query`, `test_library_video_filters_by_query`).
+- Verification: `cd apps/api && .\.venv\Scripts\python -m pytest` — 217 passed.
+- Next small step: add search inputs to the Audio and Video cards in the main web app (`apps/web/src/main.tsx`) filtering items via `?q=`.
