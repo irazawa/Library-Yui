@@ -10,8 +10,8 @@ as sections in the interactive docs (`/docs`, `/redoc`):
 | Tag           | Scope                                                                  |
 | ------------- | ---------------------------------------------------------------------- |
 | `System`      | Liveness probes, version, and runtime config (`/health`, `/version`, `/config`). |
-| `Jobs`        | Download job lifecycle (`/jobs`, `/jobs/{id}`, `/jobs/{id}/start`, `/jobs/{id}/complete`, `DELETE /jobs/{id}`). |
-| `Library`     | Library listing, streaming, audio/video deletion, uploads, thumbnails, storage usage, and summary. |
+| `Jobs`        | Download job lifecycle (`/jobs`, `/jobs/{id}`, `/jobs/{id}/start`, `/jobs/{id}/complete`, `DELETE /jobs/completed`, `DELETE /jobs/{id}`). |
+| `Library`     | Library listing, streaming, audio/video deletion, uploads, thumbnails, storage usage, export, and summary. |
 | `Collections` | Tags, per-item metadata, and metadata deletion (tag assignment, search filters, metadata detail, `DELETE /library/metadata/{id}`). |
 
 ## `GET /health`
@@ -158,14 +158,71 @@ Missing directories count as `0` bytes, so this works before any downloads/uploa
 curl http://127.0.0.1:8787/library/storage
 ```
 
+## `GET /library/export`
+
+Returns a full JSON dump of all metadata records, tags, collections, and download jobs stored in the system.
+Returns empty arrays for database-backed entities when the database file does not exist yet or is empty.
+
+### Response — `200 OK`
+
+```json
+{
+  "metadata": [
+    {
+      "id": 1,
+      "filename": "track.mp3",
+      "path": "library/uploads/track.mp3",
+      "size": 10240,
+      "content_type": "audio/mpeg",
+      "uploaded_at": "2026-07-29T10:00:00Z"
+    }
+  ],
+  "tags": ["rock"],
+  "collections": [
+    {
+      "id": 1,
+      "name": "Favorites"
+    }
+  ],
+  "jobs": [
+    {
+      "id": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+      "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "status": "completed",
+      "mode": "audio"
+    }
+  ]
+}
+```
+
+| Field                  | Type   | Description                                                               |
+| ---------------------- | ------ | ------------------------------------------------------------------------- |
+| `metadata`             | array  | List of uploaded item metadata objects (`id`, `filename`, `path`, etc.).  |
+| `tags`                 | array  | Array of unique tag strings present across all items.                     |
+| `collections`          | array  | List of collection objects (`id`, `name`).                                |
+| `jobs`                 | array  | List of download job objects (`id`, `url`, `status`, `mode`).             |
+
+### Example
+
+```bash
+curl http://127.0.0.1:8787/library/export
+```
+
 ## `GET /library/audio`
 
 Returns the names of MP3 files in the audio library folder, sorted alphabetically.
 Only `.mp3` files are included. A missing directory returns an empty list.
+Supports an optional query parameter `q` for case-insensitive filename substring filtering.
 
 Each item carries a best-effort `size` (bytes from the filesystem) and
 `duration` (seconds, parsed from an MP4/MOV `moov`/`mvhd` container header
 when present; `null` otherwise — never raises).
+
+### Query parameters
+
+| Parameter | Type   | Description                                                 |
+| --------- | ------ | ----------------------------------------------------------- |
+| `q`       | string | Optional case-insensitive substring filter against filename. |
 
 ### Response — `200 OK`
 
@@ -188,7 +245,7 @@ when present; `null` otherwise — never raises).
 ### Example
 
 ```bash
-curl http://127.0.0.1:8787/library/audio
+curl "http://127.0.0.1:8787/library/audio?q=song"
 ```
 
 ## `DELETE /library/audio/{name}`
@@ -224,6 +281,41 @@ path escapes `library/audio`.
 
 ```bash
 curl -X DELETE http://127.0.0.1:8787/library/audio/song.mp3
+```
+
+## `GET /library/video`
+
+Returns the names of MP4 files in the video library folder, sorted alphabetically.
+Only `.mp4` files are included. A missing directory returns an empty list.
+Supports an optional query parameter `q` for case-insensitive filename substring filtering.
+
+### Query parameters
+
+| Parameter | Type   | Description                                                 |
+| --------- | ------ | ----------------------------------------------------------- |
+| `q`       | string | Optional case-insensitive substring filter against filename. |
+
+### Response — `200 OK`
+
+```json
+{
+  "items": [
+    { "name": "clip-a.mp4", "size": 10485760, "duration": 45.0 }
+  ]
+}
+```
+
+| Field               | Type           | Description                                                            |
+| ------------------- | -------------- | ---------------------------------------------------------------------- |
+| `items`             | array          | List of video items.                                                   |
+| `items[].name`      | string         | File name of the MP4 (no path).                                        |
+| `items[].size`      | integer        | File size in bytes (`0` on `stat` failure).                            |
+| `items[].duration`  | number \| null | Best-effort duration in seconds (container-parsed), or `null`.         |
+
+### Example
+
+```bash
+curl "http://127.0.0.1:8787/library/video?q=clip"
 ```
 
 ## `GET /library/video/{name}`
@@ -466,6 +558,29 @@ Returned when no job exists for the given `job_id`.
 
 ```bash
 curl -X DELETE http://127.0.0.1:8787/jobs/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
+```
+
+## `DELETE /jobs/completed`
+
+Clears all finished (`completed`) or failed (`failed`) download jobs from the job store.
+Active (`pending` or `downloading`) jobs are preserved.
+
+### Response — `200 OK`
+
+```json
+{
+  "count": 3
+}
+```
+
+| Field   | Type    | Description                                             |
+| ------- | ------- | ------------------------------------------------------- |
+| `count` | integer | Total number of completed/failed jobs removed.          |
+
+### Example
+
+```bash
+curl -X DELETE http://127.0.0.1:8787/jobs/completed
 ```
 
 ## `POST /library/upload`

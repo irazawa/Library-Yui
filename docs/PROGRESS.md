@@ -606,3 +606,10 @@
 - Task: added `GET /library/export` endpoint in `apps/api/app/routes/library.py` returning a JSON dump of all metadata, tags, collections, and jobs (`metadata`, `tags`, `collections`, `jobs`), gracefully returning empty lists when the database or job store is empty; added unit tests in `apps/api/tests/test_library.py` (`test_library_export_returns_empty_lists_when_no_db_or_jobs`, `test_library_export_dumps_all_entities`).
 - Verification: `cd apps/api && .\.venv\Scripts\python -m pytest` — 219 passed.
 - Next small step: update `docs/API.md` documenting `DELETE /jobs/completed`, `GET /library/export`, and `?q=` search params on audio/video endpoints.
+
+## 2026-07-29 12:03 SEAST — Slow Builder (API Documentation Update)
+
+- Task: updated `docs/API.md` with complete documentation for `DELETE /jobs/completed`, `GET /library/export`, `GET /library/video`, and the optional search query parameter `?q=` on `GET /library/audio` and `GET /library/video`; updated tag summary table and verified all examples with `git diff --check`.
+- Verification: `git diff --check` — clean with zero whitespace or formatting issues; `cd apps/api && .\.venv\Scripts\python -m pytest` — 219 passed.
+- Next small step: plan the next batch of features for MVP 7.
+

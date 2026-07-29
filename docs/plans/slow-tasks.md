@@ -193,5 +193,5 @@ Each task is small, self-contained, and verifiable with a single `pytest` run
 - [x] Fix download job remaining in pending status by triggering `POST /jobs/{id}/start` upon job creation in main web app (`apps/web/src/main.tsx`), auto-refreshing library on completion, and enabling `LIBRARY_YUI_DOWNLOADS_ENABLED=1` in `scripts/dev.sh`.
 - [x] Add a remove button for collection items in main web app calling `DELETE /collections/{name}/items/{metadata_id}`; verify with `npm run build` in `apps/web`.
 - [x] Add `GET /library/export` endpoint in `apps/api/app/routes/library.py` returning a JSON dump of all metadata, tags, collections, and jobs; add tests in `tests/test_library.py`.
-- [ ] Update `docs/API.md` documenting `DELETE /jobs/completed`, `GET /library/export`, and `?q=` search params on audio/video endpoints; verify with `git diff --check`.
+- [x] Update `docs/API.md` documenting `DELETE /jobs/completed`, `GET /library/export`, and `?q=` search params on audio/video endpoints; verify with `git diff --check`.
 
