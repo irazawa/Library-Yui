@@ -514,6 +514,39 @@ def get_collection_by_name(
         connection.close()
 
 
+def delete_collection(
+    name: str,
+    db_path: Path | str = DEFAULT_DB_PATH,
+) -> dict | None:
+    """Delete a collection by *name* and all its item join rows.
+
+    Returns the deleted collection row ``{"id": ..., "name": ...}`` or ``None``
+    when no collection with that name exists.
+    """
+
+    connection = get_connection(db_path)
+    try:
+        row = connection.execute(
+            "SELECT id, name FROM collections WHERE name = ?", (name,)
+        ).fetchone()
+        if row is None:
+            return None
+        deleted = dict(row)
+        connection.execute(
+            "DELETE FROM collection_items WHERE collection_id = ?",
+            (deleted["id"],),
+        )
+        connection.execute(
+            "DELETE FROM collections WHERE id = ?",
+            (deleted["id"],),
+        )
+        connection.commit()
+        return deleted
+    finally:
+        connection.close()
+
+
+
 def add_item_to_collection(
     collection_id: int,
     metadata_id: int,

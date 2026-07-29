@@ -1177,3 +1177,29 @@ def test_library_export_dumps_all_entities(monkeypatch, tmp_path):
     assert body["collections"][0]["name"] == "Favorites"
     assert len(body["jobs"]) == 1
     assert body["jobs"][0]["id"] == job["id"]
+
+
+def test_delete_collection_returns_204_and_removes_collection(monkeypatch, tmp_path):
+    db_path = tmp_path / "test.db"
+    monkeypatch.setattr(library_route, "DB_PATH", db_path)
+
+    client.post("/collections", json={"name": "Favorites"})
+
+    response = client.delete("/collections/Favorites")
+
+    assert response.status_code == 204
+    assert response.content == b""
+
+    get_resp = client.get("/collections")
+    assert get_resp.status_code == 200
+    assert get_resp.json()["items"] == []
+
+
+def test_delete_collection_unknown_returns_404(monkeypatch, tmp_path):
+    db_path = tmp_path / "test.db"
+    monkeypatch.setattr(library_route, "DB_PATH", db_path)
+
+    response = client.delete("/collections/MissingCollection")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Collection not found"

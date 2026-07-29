@@ -622,3 +622,9 @@
 - Task: all previous slow-tasks in queue were completed; generated the next batch of 7 tiny tasks targeting MVP 7 (Collection Management & Data Backup/Restore: `DELETE /collections/{name}`, `POST /collections/{name}/rename`, `POST /library/import`, and corresponding frontend UI controls + API docs update) and merged into `docs/plans/slow-tasks.md`.
 - Verification: `git diff --check` — clean with zero whitespace or formatting issues.
 - Next small step: add `DELETE /collections/{name}` API endpoint in `apps/api/app/routes/library.py` to delete a collection and its join rows from the database.
+
+## 2026-07-29 15:03 SEAST — Slow Builder (DELETE /collections/{name})
+
+- Task: added `delete_collection` database helper in `apps/api/app/database.py` and `DELETE /collections/{name}` API endpoint in `apps/api/app/routes/library.py` to delete a collection and its join rows from the database with 204 No Content response and 404 for unknown collections; added unit and integration tests in `apps/api/tests/test_database.py` and `apps/api/tests/test_library.py`.
+- Verification: `cd apps/api && .\.venv\Scripts\python -m pytest` — 223 passed.
+- Next small step: add a delete collection button to the Collections card in the main web app (`apps/web/src/main.tsx`) calling `DELETE /collections/{name}`.

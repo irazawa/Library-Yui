@@ -963,6 +963,28 @@ def list_collections() -> CollectionListResponse:
     return CollectionListResponse(items=[CollectionResponse(**row) for row in rows])
 
 
+@router.delete(
+    "/collections/{name}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["Collections"],
+)
+def delete_collection(name: str) -> None:
+    """Delete a collection and its item memberships.
+
+    Returns 204 No Content on success. Returns 404 when the collection is not found.
+    """
+
+    database.init_db(DB_PATH)
+    deleted = database.delete_collection(name, db_path=DB_PATH)
+    if deleted is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Collection not found",
+        )
+    return None
+
+
+
 def _resolve_collection(name: str) -> dict:
     """Return the collection row for *name* or raise a 404."""
 

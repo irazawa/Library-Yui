@@ -840,3 +840,30 @@ def test_collection_items_migration_is_idempotent(tmp_path):
     finally:
         connection.close()
     assert rows == [(3, 7)]
+
+
+def test_delete_collection_removes_collection_and_items(tmp_path):
+    """delete_collection removes the collection row and its item join rows."""
+    db_path = tmp_path / "library.db"
+    database.init_db(db_path=db_path)
+    coll = database.create_collection("Favorites", db_path=db_path)
+    meta_id = database.insert_metadata(
+        filename="song.mp3", path="p", size=1, db_path=db_path
+    )
+    database.add_item_to_collection(coll["id"], meta_id, db_path=db_path)
+
+    deleted = database.delete_collection("Favorites", db_path=db_path)
+
+    assert deleted == coll
+    assert database.get_collection_by_name("Favorites", db_path=db_path) is None
+    assert database.list_collection_items(coll["id"], db_path=db_path) == []
+
+
+def test_delete_collection_returns_none_when_missing(tmp_path):
+    """delete_collection returns None when deleting a non-existent collection."""
+    db_path = tmp_path / "library.db"
+    database.init_db(db_path=db_path)
+
+    deleted = database.delete_collection("Missing", db_path=db_path)
+
+    assert deleted is None
